@@ -8,5 +8,5 @@ class Identity(nn.Module):
     def __init__(self):
         super(Identity, self).__init__()
 
-    def forward(self, noised_and_cover):
+    def forward(self, noised_and_cover, cover_image=None):
         return noised_and_cover

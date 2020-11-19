@@ -14,7 +14,7 @@ from noise_layers.gaussian import Gaussian
 from noise_layers.dropout import Dropout
 from noise_layers.resize import Resize
 from config import GlobalConfig
-from model.prep_novel import Prep_pureUnet
+from model.prep_HQnet import Prep_pureUnet
 
 
 class HighQualityNet:

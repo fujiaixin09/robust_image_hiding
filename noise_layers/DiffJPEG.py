@@ -31,7 +31,7 @@ class DiffJPEG(nn.Module):
         self.decompress = decompress_jpeg(height, width, rounding=rounding,
                                           factor=factor)
 
-    def forward(self, x):
+    def forward(self, x, cover_image=None):
         '''
         需要先做denormalize，再normalize回来
         '''
