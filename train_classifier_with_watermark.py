@@ -9,8 +9,6 @@ import torch.utils.data.distributed
 import torchvision.datasets as datasets
 from torch.utils import data
 from torchvision import transforms
-
-import utils
 from config import GlobalConfig
 from high_quality_net import HighQualityNet
 from my_dataset import MyDataset
