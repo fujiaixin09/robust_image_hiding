@@ -36,7 +36,7 @@ class mainClass:
         #     pin_memory=True, shuffle=True, drop_last=True)
 
         self.train_dataset = MyDataset(root='F:\\ILSVRC2012_img_val\\',filename='./val.txt')
-        self.another_dataset = MyDataset(root='F:\\ILSVRC2012_img_val\\', filename='./val.txt', grayscale=True)
+        self.another_dataset = MyDataset(root='F:\\ILSVRC2012_img_val\\', filename='./val.txt', grayscale=True, size=64)
         print(len(self.train_dataset))
         self.train_loader = data.DataLoader(dataset=self.train_dataset, batch_size=self.config.train_batch_size,
                                             shuffle=True, num_workers=4)

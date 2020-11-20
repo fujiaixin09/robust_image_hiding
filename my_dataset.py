@@ -11,7 +11,7 @@ from torchvision import transforms
 
 
 class MyDataset(Dataset):
-    def __init__(self, root, filename='./val.txt', grayscale=False):
+    def __init__(self, root, filename='./val.txt', grayscale=False, size=256):
         # 所有图片的绝对路径
         self.imgs = []
         self.grayscale = grayscale
@@ -23,8 +23,8 @@ class MyDataset(Dataset):
                 self.imgs.append(os.path.join(subroot, img))
         if not grayscale:
             self.transforms = transforms.Compose([
-                 transforms.Resize(256),
-                 transforms.CenterCrop(256),
+                 transforms.Resize(size),
+                 transforms.CenterCrop(size),
                  transforms.ToTensor(),
                  transforms.Normalize(
                  mean=[0.485, 0.456, 0.406],
@@ -32,8 +32,8 @@ class MyDataset(Dataset):
              )])
         else:
             self.transforms = transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(256),
+                transforms.Resize(size),
+                transforms.CenterCrop(size),
                 transforms.Grayscale(),
                 transforms.ToTensor(),
                 transforms.Normalize(

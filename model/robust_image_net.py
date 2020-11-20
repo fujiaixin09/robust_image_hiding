@@ -74,6 +74,7 @@ class RobustImageNet:
         self.optimizer_discrim_patchRecovery = torch.optim.Adam(self.discriminator_patchRecovery.parameters())
 
         self.downsample_layer = PureUpsampling(scale=64 / 256).cuda()
+        self.downsample_layer = PureUpsampling(scale=256 / 64).cuda()
         self.bce_with_logits_loss = nn.BCEWithLogitsLoss().cuda()
         self.mse_loss = nn.MSELoss().cuda()
         self.ssim_loss = pytorch_ssim.SSIM().cuda()
@@ -103,9 +104,9 @@ class RobustImageNet:
             self.optimizer_decoder.zero_grad()
             self.optimizer_discrim_patchHiddem.zero_grad()
             self.optimizer_discrim_patchRecovery.zero_grad()
-            # Marked = self.encoder(Cover, Water)
-            Res = self.encoder(Cover, Water)
-            Marked = Res+Cover
+            Marked = self.encoder(Cover, Water)
+            # Res = self.encoder(Cover, Water)
+            # Marked = Res+Cover
             # Residual = torch.abs(Marked-Cover)
             """Attack"""
             random_noise_layer = np.random.choice(self.noise_layers, 1)[0]
@@ -140,8 +141,8 @@ class RobustImageNet:
             Extracted_3 = Extracted.expand(-1, 3, -1, -1)
             Water_3 = Water.expand(-1, 3, -1, -1)
             loss_marked = self.getVggLoss(Marked, Cover)
+            # loss_recovery = self.mse_loss(Extracted, Water)
             loss_recovery = self.getVggLoss(Extracted_3, Water_3)
-            # loss_recovery = self.mse_loss(self.downsample_layer(Extracted), self.downsample_layer(Water))
 
             g_loss_adv_enc = self.criterionGAN(self.discriminator_patchHidden(Marked), True)
             g_loss_adv_recovery = self.criterionGAN(self.discriminator_patchRecovery(Extracted), True)
@@ -149,10 +150,11 @@ class RobustImageNet:
             # d_on_encoded_for_enc = self.discriminator(Marked)
             # g_loss_adv = self.bce_with_logits_loss(d_on_encoded_for_enc, g_target_label_encoded)
 
-            param = -0.125*loss_marked+1.1875
-            param = max(0.25, param)
-            param = min(1, param)
-            print("Param: {0:.4f}".format(param))
+            # param = -0.125*loss_marked+1.1875
+            # param = max(0.25, param)
+            # param = min(1, param)
+            # print("Param: {0:.4f}".format(param))
+            param = 1
             loss_enc_dec = param * (loss_recovery + g_loss_adv_recovery * self.config.hyper_discriminator)
 
             loss_enc_dec += loss_marked + g_loss_adv_enc * self.config.hyper_discriminator
@@ -178,7 +180,7 @@ class RobustImageNet:
             print("PSNR:(Hidden Cover) {}".format(
                 10 * math.log10(255.0 ** 2 / torch.mean((Marked_d * 255 - Cover_d * 255) ** 2))))
             print("PSNR:(Extracted Cover) {}".format(
-                10 * math.log10(255.0 ** 2 / torch.mean((Extracted_d * 255 - Cover_d * 255) ** 2))))
+                10 * math.log10(255.0 ** 2 / torch.mean((Extracted_d * 255 - Water_d * 255) ** 2))))
             # SSIM
             print("SSIM:(Hidden Cover) {}".format(pytorch_ssim.ssim(Marked_d, Cover_d)))
             print("SSIM:(Recover Cover) {}".format(pytorch_ssim.ssim(Extracted_d, Water_d)))
