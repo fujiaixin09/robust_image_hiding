@@ -103,7 +103,9 @@ class RobustImageNet:
             self.optimizer_decoder.zero_grad()
             self.optimizer_discrim_patchHiddem.zero_grad()
             self.optimizer_discrim_patchRecovery.zero_grad()
-            Marked = self.encoder(Cover, Water)
+            # Marked = self.encoder(Cover, Water)
+            Res = self.encoder(Cover, Water)
+            Marked = Res+Cover
             # Residual = torch.abs(Marked-Cover)
             """Attack"""
             random_noise_layer = np.random.choice(self.noise_layers, 1)[0]
@@ -147,9 +149,13 @@ class RobustImageNet:
             # d_on_encoded_for_enc = self.discriminator(Marked)
             # g_loss_adv = self.bce_with_logits_loss(d_on_encoded_for_enc, g_target_label_encoded)
 
-            loss_enc_dec = (loss_recovery + g_loss_adv_recovery * self.config.hyper_discriminator)
-            if loss_marked>1:
-                loss_enc_dec += loss_marked + g_loss_adv_enc * self.config.hyper_discriminator
+            param = -0.125*loss_marked+1.1875
+            param = max(0, param)
+            param = min(1, param)
+            print("Param: {0:.4f}".format(param))
+            loss_enc_dec = param * (loss_recovery + g_loss_adv_recovery * self.config.hyper_discriminator)
+
+            loss_enc_dec += loss_marked + g_loss_adv_enc * self.config.hyper_discriminator
 
             loss_enc_dec.backward()
             self.optimizer_encoder.step()
