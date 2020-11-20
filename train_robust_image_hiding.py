@@ -63,7 +63,7 @@ class mainClass:
                 str = 'Net 1 Epoch {0}/{1} Training: Batch {2}/{3}. {4}' \
                     .format(epoch, self.config.num_epochs, idx + 1, len(self.train_loader), losses)
                 print(str)
-                marked, extracted, _ = images
+                marked, extracted, Residual = images
                 if idx % 1024 == 1023:
                     self.net.save_model({
                         'epoch': epoch + 1,
@@ -92,6 +92,9 @@ class mainClass:
                                               epoch, idx, i),
                                           std=self.config.std,
                                           mean=self.config.mean)
+                        utils.save_images(watermarked_images=Residual[i].cpu(),
+                                          filename='./Images/residual/epoch-{0}-residual-batch-{1}-{2}.bmp'.format(
+                                              epoch, idx, i))
                     print("Saved Images Successfully")
 
 
