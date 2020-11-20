@@ -99,6 +99,25 @@ class mainClass:
 
 
 if __name__ == '__main__':
+    if not os.path.exists('./Images/'):
+        os.mkdir('./Images/')
+        print("mkdir('./Images/')")
+    if not os.path.exists('./Images/cover/'):
+        os.mkdir('./Images/cover/')
+        print("mkdir('./Images/cover/')")
+    if not os.path.exists('./Images/extracted/'):
+        os.mkdir('./Images/extracted/')
+        print("mkdir('./Images/extracted/')")
+    if not os.path.exists('./Images/marked/'):
+        os.mkdir('./Images/marked/')
+        print("mkdir('./Images/marked/')")
+    if not os.path.exists('./Images/residual/'):
+        os.mkdir('./Images/residual/')
+        print("mkdir('./Images/residual/')")
+    if not os.path.exists('./Images/water/'):
+        os.mkdir('./Images/water/')
+        print("mkdir('./Images/water/')")
+
     main_class = mainClass()
     main_class.run()
 
