@@ -119,7 +119,7 @@ class pureUnet(nn.Module):
         )
 
         self.final128 = nn.Sequential(
-            nn.Conv2d(32, 3, kernel_size=1, padding=0),
+            nn.Conv2d(32, 1, kernel_size=1, padding=0),
             nn.Tanh()
         )
 

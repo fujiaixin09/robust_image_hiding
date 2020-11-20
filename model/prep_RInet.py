@@ -20,7 +20,7 @@ class UnetInception(nn.Module):
             SingleConv(32, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1),
         )
         self.downsample_8_Secret = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, stride=1, dilation=1, padding=1),
+            nn.Conv2d(1, 32, kernel_size=3, stride=1, dilation=1, padding=1),
             nn.ELU(inplace=True),
             SingleConv(32, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1),
         )
@@ -98,7 +98,7 @@ class UnetInception(nn.Module):
         )
         self.final256 = nn.Sequential(
             nn.Conv2d(32, 3, kernel_size=1, padding=0),
-            # nn.Tanh()
+            nn.Tanh()
         )
 
 

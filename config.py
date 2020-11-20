@@ -5,14 +5,14 @@ class GlobalConfig():
     def __init__(self):
 
         self.num_epochs = 100
-        self.train_batch_size = 8
+        self.train_batch_size = 16
         self.test_batch_size = 1
         self.architecture='ResNet'
         self.Height = 256
         self.Width = 256
         self.temperature = 10
         self.hyper = 2
-        self.hyper_discriminator = 0.01
+        self.hyper_discriminator = 0.1
         self.attack_portion = 0.2
         self.crop_size = 0.2
         self.encoder_features = 64

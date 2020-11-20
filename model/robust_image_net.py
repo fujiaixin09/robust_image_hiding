@@ -57,10 +57,10 @@ class RobustImageNet:
         self.noise_layers.append(self.resize)
         self.noise_layers.append(self.dropout)
 
-        self.discriminator_patchHidden = NLayerDiscriminator().cuda()
+        self.discriminator_patchHidden = NLayerDiscriminator(input_nc=3).cuda()
         if torch.cuda.device_count() > 1:
             self.discriminator_patchHidden = torch.nn.DataParallel(self.discriminator_patchHidden)
-        self.discriminator_patchRecovery = NLayerDiscriminator().cuda()
+        self.discriminator_patchRecovery = NLayerDiscriminator(input_nc=1).cuda()
         if torch.cuda.device_count() > 1:
             self.discriminator_patchRecovery = torch.nn.DataParallel(self.discriminator_patchRecovery)
 
@@ -107,12 +107,14 @@ class RobustImageNet:
             self.optimizer_discrim_patchRecovery.step()
 
             """Losses"""
-            loss_marked = self.getVggLoss(Marked, Cover)
-            loss_recovery = self.getVggLoss(Extracted, Water)
+            loss_marked = self.mse_loss(Marked, Cover) #self.getVggLoss(Marked, Cover)
+            loss_recovery = self.mse_loss(Extracted, Water)
             g_loss_adv_enc = self.criterionGAN(self.discriminator_patchHidden(Marked), True)
             g_loss_adv_recovery = self.criterionGAN(self.discriminator_patchRecovery(Extracted), True)
-            loss_enc_dec = loss_marked + loss_recovery
-            loss_enc_dec += g_loss_adv_recovery * self.config.hyper_discriminator + g_loss_adv_enc * self.config.hyper_discriminator
+            loss_enc_dec = (loss_recovery + 5*g_loss_adv_recovery * self.config.hyper_discriminator)
+            if loss_marked>1:
+                loss_enc_dec += 0.7*(loss_marked + g_loss_adv_enc * self.config.hyper_discriminator)
+
 
             loss_enc_dec.backward()
             self.optimizer_encoder.step()
@@ -128,6 +130,7 @@ class RobustImageNet:
             Marked_d = utils.denormalize_batch(Marked, self.config.std, self.config.mean)
             Cover_d = utils.denormalize_batch(Cover, self.config.std, self.config.mean)
             Extracted_d = utils.denormalize_batch(Extracted, self.config.std, self.config.mean)
+            Water_d = utils.denormalize_batch(Water, self.config.std, self.config.mean)
 
             # PSNR
             print("PSNR:(Hidden Cover) {}".format(
@@ -136,7 +139,7 @@ class RobustImageNet:
                 10 * math.log10(255.0 ** 2 / torch.mean((Extracted_d * 255 - Cover_d * 255) ** 2))))
             # SSIM
             print("SSIM:(Hidden Cover) {}".format(pytorch_ssim.ssim(Marked_d, Cover_d)))
-            print("SSIM:(Recover Cover) {}".format(pytorch_ssim.ssim(Extracted_d, Cover_d)))
+            print("SSIM:(Recover Cover) {}".format(pytorch_ssim.ssim(Extracted_d, Water_d)))
 
             return losses, (Marked, Extracted, Water)
 

@@ -62,8 +62,9 @@ def denormalize_batch(image, std, mean):
 
     image_denorm = torch.empty_like(image)
     image_denorm[:, 0, :, :] = (image[:, 0, :, :].clone() * std[0]) + mean[0]
-    image_denorm[:, 1, :, :] = (image[:, 1, :, :].clone() * std[1]) + mean[1]
-    image_denorm[:, 2, :, :] = (image[:, 2, :, :].clone() * std[2]) + mean[2]
+    if image.shape[1]>1:
+        image_denorm[:, 1, :, :] = (image[:, 1, :, :].clone() * std[1]) + mean[1]
+        image_denorm[:, 2, :, :] = (image[:, 2, :, :].clone() * std[2]) + mean[2]
 
     # for t in range(image.shape[1]):
     #     image[:, t, :, :] = (image[:, t, :, :] * std[t]) + mean[t]

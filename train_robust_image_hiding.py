@@ -29,17 +29,18 @@ class mainClass:
                                  std=self.config.std)
         ])
         # Creates training set
-        self.train_loader = torch.utils.data.DataLoader(
-            datasets.ImageFolder(
-                self.config.TRAIN_PATH,
-                transform), batch_size=self.config.train_batch_size, num_workers=4,
-            pin_memory=True, shuffle=True, drop_last=True)
+        # self.train_loader = torch.utils.data.DataLoader(
+        #     datasets.ImageFolder(
+        #         self.config.TRAIN_PATH,
+        #         transform), batch_size=self.config.train_batch_size, num_workers=4,
+        #     pin_memory=True, shuffle=True, drop_last=True)
 
         self.train_dataset = MyDataset(root='F:\\ILSVRC2012_img_val\\',filename='./val.txt')
+        self.another_dataset = MyDataset(root='F:\\ILSVRC2012_img_val\\', filename='./val.txt', grayscale=True)
         print(len(self.train_dataset))
         self.train_loader = data.DataLoader(dataset=self.train_dataset, batch_size=self.config.train_batch_size,
                                             shuffle=True, num_workers=4)
-        self.another_loader = data.DataLoader(dataset=self.train_dataset, batch_size=self.config.train_batch_size,
+        self.another_loader = data.DataLoader(dataset=self.another_dataset, batch_size=self.config.train_batch_size,
                                             shuffle=True, num_workers=4)
 
         self.net = RobustImageNet(config=self.config)
@@ -63,7 +64,7 @@ class mainClass:
                     .format(epoch, self.config.num_epochs, idx + 1, len(self.train_loader), losses)
                 print(str)
                 marked, extracted, _ = images
-                if idx % 10240 == 10239:
+                if idx % 1024 == 1023:
                     self.net.save_model({
                         'epoch': epoch + 1,
                         'arch': self.config.architecture,
@@ -91,7 +92,7 @@ class mainClass:
                                               epoch, idx, i),
                                           std=self.config.std,
                                           mean=self.config.mean)
-                        print("Saved Images Successfully")
+                    print("Saved Images Successfully")
 
 
 if __name__ == '__main__':

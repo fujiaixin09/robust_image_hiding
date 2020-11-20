@@ -11,24 +11,35 @@ from torchvision import transforms
 
 
 class MyDataset(Dataset):
-    def __init__(self, root, filename='./val.txt'):
+    def __init__(self, root, filename='./val.txt', grayscale=False):
         # 所有图片的绝对路径
         self.imgs = []
+        self.grayscale = grayscale
         subfolders = os.listdir(root)
         for subfolder in subfolders:
             subroot = os.path.join(root, subfolder)
             imgs = os.listdir(subroot)
             for img in imgs:
                 self.imgs.append(os.path.join(subroot, img))
-
-        self.transforms = transforms.Compose([
-             transforms.Resize(256),
-             transforms.CenterCrop(256),
-             transforms.ToTensor(),
-             transforms.Normalize(
-             mean=[0.485, 0.456, 0.406],
-             std=[0.229, 0.224, 0.225]
-         )])
+        if not grayscale:
+            self.transforms = transforms.Compose([
+                 transforms.Resize(256),
+                 transforms.CenterCrop(256),
+                 transforms.ToTensor(),
+                 transforms.Normalize(
+                 mean=[0.485, 0.456, 0.406],
+                 std=[0.229, 0.224, 0.225]
+             )])
+        else:
+            self.transforms = transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(256),
+                transforms.Grayscale(),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485],
+                    std=[0.229]
+                )])
 
         #  get groundtruth
         self.ground_truth = {}
