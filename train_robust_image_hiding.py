@@ -21,13 +21,13 @@ class mainClass:
         print("torch.distributed.is_available: "+str(torch.distributed.is_available()))
         print("Device Count: {0}".format(torch.cuda.device_count()))
 
-        transform = transforms.Compose([
-            transforms.Resize(self.config.Width),
-            transforms.RandomCrop(self.config.Width),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=self.config.mean,
-                                 std=self.config.std)
-        ])
+        # transform = transforms.Compose([
+        #     transforms.Resize(self.config.Width),
+        #     transforms.RandomCrop(self.config.Width),
+        #     transforms.ToTensor(),
+        #     transforms.Normalize(mean=self.config.mean,
+        #                          std=self.config.std)
+        # ])
         # Creates training set
         # self.train_loader = torch.utils.data.DataLoader(
         #     datasets.ImageFolder(

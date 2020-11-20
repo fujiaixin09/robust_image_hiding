@@ -9,64 +9,64 @@ from network.pure_upsample import PureUpsampling
 from network.single_de_conv import SingleDeConv
 
 class UnetInception(nn.Module):
-    def __init__(self,config=GlobalConfig(), CoverF=32, WaterF=32):
+    def __init__(self,config=GlobalConfig(), CoverF=16, WaterF=16):
         super(UnetInception, self).__init__()
         self.config = config
         # input channel: 3, output channel: 96
         """Features with Kernel Size 7---->channel:128 """
         self.downsample_8_Cover = nn.Sequential(
-            nn.Conv2d(3, CoverF, kernel_size=3, stride=1, dilation=1, padding=1),
+            nn.Conv2d(3, CoverF, kernel_size=4, stride=1, dilation=1, padding=1),
             nn.ELU(inplace=True),
-            SingleConv(CoverF, out_channels=CoverF, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF, out_channels=CoverF, kernel_size=4, stride=1, dilation=1, padding=2),
         )
         self.downsample_8_Secret = nn.Sequential(
-            nn.Conv2d(1, WaterF, kernel_size=3, stride=1, dilation=1, padding=1),
+            nn.Conv2d(1, WaterF, kernel_size=4, stride=1, dilation=1, padding=1),
             nn.ELU(inplace=True),
-            SingleConv(WaterF, out_channels=WaterF, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF, out_channels=WaterF, kernel_size=4, stride=1, dilation=1, padding=2),
         )
         # 128
         self.downsample_7_Cover = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(CoverF, out_channels=CoverF*2, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF*2, out_channels=CoverF*2, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(CoverF, out_channels=CoverF*2, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF*2, out_channels=CoverF*2, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         self.downsample_7_Secret = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(WaterF, out_channels=WaterF*2, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*2, out_channels=WaterF*2, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF, out_channels=WaterF*2, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*2, out_channels=WaterF*2, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # 64
         self.downsample_6_Cover = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(CoverF*2, out_channels=CoverF*4, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF*4, out_channels=CoverF*4, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(CoverF*2, out_channels=CoverF*4, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF*4, out_channels=CoverF*4, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         self.downsample_6_Secret = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(WaterF*2, out_channels=WaterF*4, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*4, out_channels=WaterF*4, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF*2, out_channels=WaterF*4, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*4, out_channels=WaterF*4, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # 32
         self.downsample_5_Cover = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(CoverF*4, out_channels=CoverF*8, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF*8, out_channels=CoverF*8, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(CoverF*4, out_channels=CoverF*8, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF*8, out_channels=CoverF*8, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         self.downsample_5_Secret = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(WaterF*4, out_channels=WaterF*8, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF*4, out_channels=WaterF*8, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # 16
         self.downsample_4_Cover = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(CoverF*8, out_channels=CoverF*8, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF*8, out_channels=CoverF*8, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(CoverF*8, out_channels=CoverF*8, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF*8, out_channels=CoverF*8, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         self.downsample_4_Secret = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # 16以下的卷积用4层conv
         self.fullConv = nn.Sequential(
@@ -78,23 +78,23 @@ class UnetInception(nn.Module):
         self.pureUpsamle = PureUpsampling(scale=2)
         # 32
         self.upsample4_3 = nn.Sequential(
-            SingleConv(CoverF*8*2+WaterF*8, out_channels=CoverF*8, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF*8, out_channels=CoverF*4, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(CoverF*8*2+WaterF*8, out_channels=CoverF*8, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF*8, out_channels=CoverF*4, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # 64
         self.upsample3_3 = nn.Sequential(
-            SingleConv(CoverF*4*2+WaterF*4, out_channels=CoverF*4, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF*4, out_channels=CoverF*2, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(CoverF*4*2+WaterF*4, out_channels=CoverF*4, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF*4, out_channels=CoverF*2, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # 128
         self.upsample2_3 = nn.Sequential(
-            SingleConv(CoverF*2*2+WaterF*2, out_channels=CoverF*2, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF*2, out_channels=CoverF, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(CoverF*2*2+WaterF*2, out_channels=CoverF*2, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF*2, out_channels=CoverF, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # 256
         self.upsample1_3 = nn.Sequential(
-            SingleConv(CoverF*2+WaterF, out_channels=CoverF, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF, out_channels=CoverF, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(CoverF*2+WaterF, out_channels=CoverF, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF, out_channels=CoverF, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         self.final256 = nn.Sequential(
             nn.Conv2d(CoverF, 3, kernel_size=1, padding=0),

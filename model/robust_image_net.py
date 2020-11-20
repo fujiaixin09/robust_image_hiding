@@ -150,7 +150,7 @@ class RobustImageNet:
             # g_loss_adv = self.bce_with_logits_loss(d_on_encoded_for_enc, g_target_label_encoded)
 
             param = -0.125*loss_marked+1.1875
-            param = max(0, param)
+            param = max(0.25, param)
             param = min(1, param)
             print("Param: {0:.4f}".format(param))
             loss_enc_dec = param * (loss_recovery + g_loss_adv_recovery * self.config.hyper_discriminator)

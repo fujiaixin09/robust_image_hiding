@@ -9,39 +9,39 @@ from network.pure_upsample import PureUpsampling
 from network.single_de_conv import SingleDeConv
 
 class pureUnet(nn.Module):
-    def __init__(self,config=GlobalConfig(), WaterF=64):
+    def __init__(self,config=GlobalConfig(), WaterF=32):
         super(pureUnet, self).__init__()
         self.config = config
         # input channel: 3, output channel: 96
         """Features with Kernel Size 7---->channel:WaterF*2 """
         self.downsample_8 = nn.Sequential(
-            nn.Conv2d(3, WaterF, kernel_size=3, stride=1, dilation=1, padding=1),
+            nn.Conv2d(3, WaterF, kernel_size=4, stride=1, dilation=1, padding=1),
             nn.ELU(inplace=True),
-            SingleConv(WaterF, out_channels=WaterF, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF, out_channels=WaterF, kernel_size=4, stride=1, dilation=1, padding=2),
         )
         # WaterF*2
         self.downsample_7 = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(WaterF, out_channels=WaterF*2, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*2, out_channels=WaterF*2, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF, out_channels=WaterF*2, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*2, out_channels=WaterF*2, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # WaterF
         self.downsample_6 = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(WaterF*2, out_channels=WaterF*4, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*4, out_channels=WaterF*4, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF*2, out_channels=WaterF*4, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*4, out_channels=WaterF*4, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # WaterF
         self.downsample_5 = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(WaterF*4, out_channels=WaterF*8, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF*4, out_channels=WaterF*8, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # WaterF
         self.downsample_4 = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*8, out_channels=WaterF*8, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # WaterF以下的卷积用4层conv
         self.fullConv = nn.Sequential(
@@ -97,25 +97,25 @@ class pureUnet(nn.Module):
         self.pureUpsamle = PureUpsampling(scale=2)
         # WaterF
         self.upsample4_3 = nn.Sequential(
-            SingleConv(WaterF*8*2, out_channels=WaterF*8, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*8, out_channels=WaterF*4, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF*8*2, out_channels=WaterF*8, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*8, out_channels=WaterF*4, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # WaterF
         self.upsample3_3 = nn.Sequential(
-            SingleConv(WaterF*8, out_channels=WaterF*4, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*4, out_channels=WaterF*2, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF*8, out_channels=WaterF*4, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*4, out_channels=WaterF*2, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # WaterF*2
 
         self.upsample2_3 = nn.Sequential(
-            SingleConv(WaterF*4, out_channels=WaterF*2, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF*2, out_channels=WaterF, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF*4, out_channels=WaterF*2, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF*2, out_channels=WaterF, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         # WaterF*4
 
         self.upsample1_3 = nn.Sequential(
-            SingleConv(WaterF*2, out_channels=WaterF, kernel_size=3, stride=1, dilation=1, padding=1),
-            SingleConv(WaterF, out_channels=WaterF, kernel_size=3, stride=1, dilation=1, padding=1)
+            SingleConv(WaterF*2, out_channels=WaterF, kernel_size=4, stride=1, dilation=1, padding=1),
+            SingleConv(WaterF, out_channels=WaterF, kernel_size=4, stride=1, dilation=1, padding=2)
         )
 
         self.finalWater256 = nn.Sequential(
