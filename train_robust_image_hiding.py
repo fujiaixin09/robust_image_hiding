@@ -21,27 +21,41 @@ class mainClass:
         print("torch.distributed.is_available: "+str(torch.distributed.is_available()))
         print("Device Count: {0}".format(torch.cuda.device_count()))
 
-        # transform = transforms.Compose([
-        #     transforms.Resize(self.config.Width),
-        #     transforms.RandomCrop(self.config.Width),
-        #     transforms.ToTensor(),
-        #     transforms.Normalize(mean=self.config.mean,
-        #                          std=self.config.std)
-        # ])
         # Creates training set
-        # self.train_loader = torch.utils.data.DataLoader(
-        #     datasets.ImageFolder(
-        #         self.config.TRAIN_PATH,
-        #         transform), batch_size=self.config.train_batch_size, num_workers=4,
-        #     pin_memory=True, shuffle=True, drop_last=True)
+        train_transform = transforms.Compose([
+            transforms.Resize(self.config.Width),
+            transforms.RandomCrop(self.config.Width),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=self.config.mean,
+                                 std=self.config.std)
+        ])
+        self.train_loader = torch.utils.data.DataLoader(
+            datasets.ImageFolder(
+                self.config.TRAIN_PATH,
+                train_transform), batch_size=self.config.train_batch_size, num_workers=4,
+            pin_memory=True, shuffle=True, drop_last=True)
+        # Creates another set
+        another_transform = transforms.Compose([
+            transforms.Resize(self.config.Water_Width),
+            transforms.RandomCrop(self.config.Water_Width),
+            transforms.Grayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=self.config.mean[0],
+                                 std=self.config.std[0])
+        ])
+        self.another_loader = torch.utils.data.DataLoader(
+            datasets.ImageFolder(
+                self.config.TRAIN_PATH,
+                another_transform), batch_size=self.config.train_batch_size, num_workers=4,
+            pin_memory=True, shuffle=True, drop_last=True)
 
-        self.train_dataset = MyDataset(root='F:\\ILSVRC2012_img_val\\',filename='./val.txt')
-        self.another_dataset = MyDataset(root='F:\\ILSVRC2012_img_val\\', filename='./val.txt', grayscale=True, size=64)
-        print(len(self.train_dataset))
-        self.train_loader = data.DataLoader(dataset=self.train_dataset, batch_size=self.config.train_batch_size,
-                                            shuffle=True, num_workers=4)
-        self.another_loader = data.DataLoader(dataset=self.another_dataset, batch_size=self.config.train_batch_size,
-                                            shuffle=True, num_workers=4)
+        # self.train_dataset = MyDataset(root=self.config.TRAIN_PATH,filename=self.config.TAG_PATH,mean=self.config.mean,std=self.config.std)
+        # self.another_dataset = MyDataset(root=self.config.TRAIN_PATH, filename=self.config.TAG_PATH, grayscale=True, size=64,mean=self.config.mean,std=self.config.std)
+        # print(len(self.train_dataset))
+        # self.train_loader = data.DataLoader(dataset=self.train_dataset, batch_size=self.config.train_batch_size,
+        #                                     shuffle=True, num_workers=4)
+        # self.another_loader = data.DataLoader(dataset=self.another_dataset, batch_size=self.config.train_batch_size,
+        #                                     shuffle=True, num_workers=4)
 
         self.net = RobustImageNet(config=self.config)
         self.train_cover, self.another = None, None

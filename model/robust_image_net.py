@@ -50,14 +50,14 @@ class RobustImageNet:
         self.dropout = Dropout(self.config,keep_ratio_range=(0.5,0.75)).cuda()
         self.resize = Resize().cuda()
         # self.crop_layer = Crop((0.2, 0.5), (0.2, 0.5)).cuda()
-        self.noise_layers.append(self.jpeg_layer_80)
-        self.noise_layers.append(self.jpeg_layer_90)
+        # self.noise_layers.append(self.jpeg_layer_80)
+        # self.noise_layers.append(self.jpeg_layer_90)
         self.noise_layers.append(self.jpeg_layer_70)
-        self.noise_layers.append(self.jpeg_layer_60)
-        self.noise_layers.append(self.jpeg_layer_50)
-        self.noise_layers.append(self.gaussian)
-        self.noise_layers.append(self.resize)
-        self.noise_layers.append(self.dropout)
+        # self.noise_layers.append(self.jpeg_layer_60)
+        # self.noise_layers.append(self.jpeg_layer_50)
+        # self.noise_layers.append(self.gaussian)
+        # self.noise_layers.append(self.resize)
+        # self.noise_layers.append(self.dropout)
 
         # self.discriminator = Discriminator(self.config).cuda()
         # if torch.cuda.device_count() > 1:
@@ -155,7 +155,7 @@ class RobustImageNet:
             # param = min(1, param)
             # print("Param: {0:.4f}".format(param))
             param = 1
-            loss_enc_dec = param * (loss_recovery + g_loss_adv_recovery * self.config.hyper_discriminator)
+            loss_enc_dec = param * (loss_recovery) #+ g_loss_adv_recovery * self.config.hyper_discriminator)
 
             loss_enc_dec += loss_marked + g_loss_adv_enc * self.config.hyper_discriminator
 

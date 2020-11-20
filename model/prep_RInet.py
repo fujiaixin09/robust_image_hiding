@@ -112,7 +112,7 @@ class UnetInception(nn.Module):
             SingleConv(CoverF, out_channels=CoverF, kernel_size=4, stride=1, dilation=1, padding=2)
         )
         self.final256 = nn.Sequential(
-            nn.Conv2d(CoverF, 3, kernel_size=1, padding=0),
+            nn.Conv2d(CoverF+3, 3, kernel_size=1, padding=0),
             nn.Tanh()
         )
 
@@ -152,6 +152,7 @@ class UnetInception(nn.Module):
         up1_up = self.Upsamle1_3(up2)
         up1_cat = torch.cat((down8, up1_up), 1)
         up1 = self.upsample1_3(up1_cat)
-        up0 = self.final256(up1)
+        up0_cat = torch.cat((up1, cover), 1)
+        up0 = self.final256(up0_cat)
 
         return up0
