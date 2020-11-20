@@ -19,7 +19,7 @@ class SingleDeConv(nn.Module):
                       kernel_size=kernel_size, padding=padding,stride=stride,dilation=dilation),
             nn.BatchNorm2d(out_channels),
             # nn.InstanceNorm2d(out_channels),
-            nn.ELU(inplace=True)
+            nn.ELU()
         )
 
     def forward(self, x):

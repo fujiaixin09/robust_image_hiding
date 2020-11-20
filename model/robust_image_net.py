@@ -59,19 +59,23 @@ class RobustImageNet:
         # self.noise_layers.append(self.resize)
         # self.noise_layers.append(self.dropout)
 
-        # self.discriminator = Discriminator(self.config).cuda()
+        self.discriminator = Discriminator(self.config).cuda()
+        if torch.cuda.device_count() > 1:
+            self.discriminator = torch.nn.DataParallel(self.discriminator)
+        self.discriminator_B = Discriminator(self.config).cuda()
+        if torch.cuda.device_count() > 1:
+            self.discriminator_B = torch.nn.DataParallel(self.discriminator_B)
+        # self.discriminator_patchHidden = NLayerDiscriminator(input_nc=3).cuda()
         # if torch.cuda.device_count() > 1:
-        #     self.discriminator = torch.nn.DataParallel(self.discriminator)
-        self.discriminator_patchHidden = NLayerDiscriminator(input_nc=3).cuda()
-        if torch.cuda.device_count() > 1:
-            self.discriminator_patchHidden = torch.nn.DataParallel(self.discriminator_patchHidden)
-        self.discriminator_patchRecovery = NLayerDiscriminator(input_nc=1).cuda()
-        if torch.cuda.device_count() > 1:
-            self.discriminator_patchRecovery = torch.nn.DataParallel(self.discriminator_patchRecovery)
+        #     self.discriminator_patchHidden = torch.nn.DataParallel(self.discriminator_patchHidden)
+        # self.discriminator_patchRecovery = NLayerDiscriminator(input_nc=1).cuda()
+        # if torch.cuda.device_count() > 1:
+        #     self.discriminator_patchRecovery = torch.nn.DataParallel(self.discriminator_patchRecovery)
 
-        # self.optimizer_discrim = torch.optim.Adam(self.discriminator.parameters())
-        self.optimizer_discrim_patchHiddem = torch.optim.Adam(self.discriminator_patchHidden.parameters())
-        self.optimizer_discrim_patchRecovery = torch.optim.Adam(self.discriminator_patchRecovery.parameters())
+        self.optimizer_discrim = torch.optim.Adam(self.discriminator.parameters())
+        self.optimizer_discrim_B = torch.optim.Adam(self.discriminator.parameters())
+        # self.optimizer_discrim_patchHiddem = torch.optim.Adam(self.discriminator_patchHidden.parameters())
+        # self.optimizer_discrim_patchRecovery = torch.optim.Adam(self.discriminator_patchRecovery.parameters())
 
         self.downsample_layer = PureUpsampling(scale=64 / 256).cuda()
         self.downsample_layer = PureUpsampling(scale=256 / 64).cuda()
@@ -96,14 +100,18 @@ class RobustImageNet:
         batch_size = Cover.shape[0]
         self.encoder.train()
         self.decoder.train()
+        self.discriminator.train()
+        self.discriminator_B.train()
         # for param in self.classification_net.parameters():
         #     param.requires_grad = False
         with torch.enable_grad():
             """ Run, Train the discriminator"""
             self.optimizer_encoder.zero_grad()
             self.optimizer_decoder.zero_grad()
-            self.optimizer_discrim_patchHiddem.zero_grad()
-            self.optimizer_discrim_patchRecovery.zero_grad()
+            self.optimizer_discrim.zero_grad()
+            self.optimizer_discrim_B.zero_grad()
+            # self.optimizer_discrim_patchHiddem.zero_grad()
+            # self.optimizer_discrim_patchRecovery.zero_grad()
             Marked = self.encoder(Cover, Water)
             # Res = self.encoder(Cover, Water)
             # Marked = Res+Cover
@@ -114,48 +122,56 @@ class RobustImageNet:
             # Attacked = Marked
             Extracted = self.decoder(Attacked)
 
-            # # ---------------- Train the discriminator -----------------------------
-            # self.optimizer_discrim_patchHiddem.zero_grad()
-            # # train on cover
-            # d_target_label_cover = torch.full((batch_size, 1), self.cover_label, dtype=torch.float32).cuda()
-            # d_target_label_encoded = torch.full((batch_size, 1), self.encoded_label, dtype=torch.float32).cuda()
-            # g_target_label_encoded = torch.full((batch_size, 1), self.cover_label, dtype=torch.float32).cuda()
-            # d_on_cover = self.discriminator(Cover)
-            # d_loss_on_cover = self.bce_with_logits_loss(d_on_cover, d_target_label_cover)
-            # d_loss_on_cover.backward()  # discrimnator on cover
-            # # train on fake
-            # d_on_encoded = self.discriminator(Marked.detach())
-            # d_loss_on_encoded = self.bce_with_logits_loss(d_on_encoded, d_target_label_encoded)
-            # d_loss_on_encoded.backward()  # discrimnator on stego
-            # self.optimizer_discrim.step()
-
-            """Discriminator"""
-            loss_D_A = self.backward_D_basic(self.discriminator_patchHidden, Cover, Marked)
-            loss_D_A.backward()
-            self.optimizer_discrim_patchHiddem.step()
-            loss_D_B = self.backward_D_basic(self.discriminator_patchRecovery, Water, Extracted)
-            loss_D_B.backward()
-            self.optimizer_discrim_patchRecovery.step()
-
-            """Losses"""
+            # ---------------- Train the discriminator -----------------------------
+            # train on cover
             Extracted_3 = Extracted.expand(-1, 3, -1, -1)
             Water_3 = Water.expand(-1, 3, -1, -1)
+            d_target_label_cover = torch.full((batch_size, 1), self.cover_label, dtype=torch.float32).cuda()
+            d_target_label_encoded = torch.full((batch_size, 1), self.encoded_label, dtype=torch.float32).cuda()
+            g_target_label_encoded = torch.full((batch_size, 1), self.cover_label, dtype=torch.float32).cuda()
+            d_on_cover = self.discriminator(Cover)
+            d_loss_on_cover = self.bce_with_logits_loss(d_on_cover, d_target_label_cover)
+            d_loss_on_cover.backward()
+            d_on_water = self.discriminator_B(Water_3)
+            d_loss_on_water = self.bce_with_logits_loss(d_on_water, d_target_label_cover)
+            d_loss_on_water.backward()
+            # train on fake
+            d_on_encoded = self.discriminator(Marked.detach())
+            d_loss_on_encoded = self.bce_with_logits_loss(d_on_encoded, d_target_label_encoded)
+            d_loss_on_encoded.backward()
+            d_on_extracted = self.discriminator_B(Extracted_3.detach())
+            d_loss_on_extracted = self.bce_with_logits_loss(d_on_extracted, d_target_label_encoded)
+            d_loss_on_extracted.backward()
+            self.optimizer_discrim.step()
+            self.optimizer_discrim_B.step()
+
+            """Discriminator"""
+            # loss_D_A = self.backward_D_basic(self.discriminator_patchHidden, Cover, Marked)
+            # loss_D_A.backward()
+            # self.optimizer_discrim_patchHiddem.step()
+            # loss_D_B = self.backward_D_basic(self.discriminator_patchRecovery, Water, Extracted)
+            # loss_D_B.backward()
+            # self.optimizer_discrim_patchRecovery.step()
+
+            """Losses"""
             loss_marked = self.getVggLoss(Marked, Cover)
             # loss_recovery = self.mse_loss(Extracted, Water)
             loss_recovery = self.getVggLoss(Extracted_3, Water_3)
 
-            g_loss_adv_enc = self.criterionGAN(self.discriminator_patchHidden(Marked), True)
-            g_loss_adv_recovery = self.criterionGAN(self.discriminator_patchRecovery(Extracted), True)
+            # g_loss_adv_enc = self.criterionGAN(self.discriminator_patchHidden(Marked), True)
+            # g_loss_adv_recovery = self.criterionGAN(self.discriminator_patchRecovery(Extracted), True)
 
-            # d_on_encoded_for_enc = self.discriminator(Marked)
-            # g_loss_adv = self.bce_with_logits_loss(d_on_encoded_for_enc, g_target_label_encoded)
+            d_on_encoded_for_enc = self.discriminator(Marked)
+            g_loss_adv_enc = self.bce_with_logits_loss(d_on_encoded_for_enc, g_target_label_encoded)
+            d_on_encoded_for_ext = self.discriminator(Extracted_3)
+            g_loss_adv_ext = self.bce_with_logits_loss(d_on_encoded_for_ext, g_target_label_encoded)
 
             # param = -0.125*loss_marked+1.1875
             # param = max(0.25, param)
             # param = min(1, param)
             # print("Param: {0:.4f}".format(param))
-            param = 1
-            loss_enc_dec = param * (loss_recovery) #+ g_loss_adv_recovery * self.config.hyper_discriminator)
+            param = 0.7
+            loss_enc_dec = param * (loss_recovery + g_loss_adv_ext * self.config.hyper_discriminator)
 
             loss_enc_dec += loss_marked + g_loss_adv_enc * self.config.hyper_discriminator
 
@@ -167,7 +183,7 @@ class RobustImageNet:
                 'loss_marked': loss_marked.item(),
                 'loss_recovery': loss_recovery.item(),
                 'g_loss_adv_enc': g_loss_adv_enc.item(),
-                'g_loss_adv_recovery': g_loss_adv_recovery.item()
+                'g_loss_adv_recovery': g_loss_adv_ext.item()
             }
 
             Marked_d = utils.denormalize_batch(Marked, self.config.std, self.config.mean)

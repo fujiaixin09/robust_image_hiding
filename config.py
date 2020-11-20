@@ -5,7 +5,7 @@ class GlobalConfig():
     def __init__(self):
 
         self.num_epochs = 100
-        self.train_batch_size = 16
+        self.train_batch_size = 8
         self.test_batch_size = 1
         self.architecture='ResNet'
         self.Height = 256

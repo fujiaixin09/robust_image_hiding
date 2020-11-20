@@ -9,14 +9,14 @@ from network.pure_upsample import PureUpsampling
 from network.single_de_conv import SingleDeConv
 
 class pureUnet(nn.Module):
-    def __init__(self,config=GlobalConfig(), CoverF=16):
+    def __init__(self,config=GlobalConfig(), CoverF=32):
         super(pureUnet, self).__init__()
         self.config = config
         # input channel: 3, output channel: 96
         """Features with Kernel Size 7---->channel:WaterF*2 """
         self.downsample_8 = nn.Sequential(
             nn.Conv2d(3, CoverF, kernel_size=4, stride=1, dilation=1, padding=1),
-            nn.ELU(inplace=True),
+            nn.ELU(inplace=False),
             SingleConv(CoverF, out_channels=CoverF, kernel_size=4, stride=1, dilation=1, padding=2),
         )
         # 128

@@ -9,19 +9,19 @@ from network.pure_upsample import PureUpsampling
 from network.single_de_conv import SingleDeConv
 
 class UnetInception(nn.Module):
-    def __init__(self,config=GlobalConfig(), CoverF=16, WaterF=32):
+    def __init__(self,config=GlobalConfig(), CoverF=32, WaterF=32):
         super(UnetInception, self).__init__()
         self.config = config
         # input channel: 3, output channel: 96
         """Features with Kernel Size 7---->channel:128 """
         self.downsample_8_Cover = nn.Sequential(
             nn.Conv2d(3, CoverF, kernel_size=4, stride=1, dilation=1, padding=1),
-            nn.ELU(inplace=True),
+            nn.ELU(),
             SingleConv(CoverF, out_channels=CoverF, kernel_size=4, stride=1, dilation=1, padding=2),
         )
         # self.downsample_8_Secret = nn.Sequential(
         #     nn.Conv2d(1, WaterF, kernel_size=4, stride=1, dilation=1, padding=1),
-        #     nn.ELU(inplace=True),
+        #     nn.ELU(),
         #     SingleConv(WaterF, out_channels=WaterF, kernel_size=4, stride=1, dilation=1, padding=2),
         # )
         # 128
@@ -43,7 +43,7 @@ class UnetInception(nn.Module):
         )
         self.downsample_6_Secret = nn.Sequential(
             nn.Conv2d(1, WaterF, kernel_size=4, stride=1, dilation=1, padding=1),
-            nn.ELU(inplace=True),
+            nn.ELU(),
             SingleConv(WaterF, out_channels=WaterF, kernel_size=4, stride=1, dilation=1, padding=2),
         )
         # 32
