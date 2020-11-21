@@ -18,7 +18,8 @@ class Dropout(nn.Module):
 
         # noised_image = noised_and_cover[0]
         # cover_image = noised_and_cover[1]
-
+        print("Dropout Attack Added")
+        self.name = "Dropout"
         mask_percent = np.random.uniform(self.keep_min, self.keep_max)
         blank = torch.zeros_like(cover_image).to(self.device)
         mask = np.random.choice([0.0, 1.0], noised_image.shape[2:], p=[1 - mask_percent, mask_percent])

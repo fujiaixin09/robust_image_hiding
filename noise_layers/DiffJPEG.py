@@ -36,6 +36,7 @@ class DiffJPEG(nn.Module):
         需要先做denormalize，再normalize回来
         '''
         print("Jpeg Quality Factor: {0}".format(self.quality))
+        self.name="Jpeg{0}".format(self.quality)
         denorm = util.denormalize_batch(x, self.config.std, self.config.mean)
         y, cb, cr = self.compress(denorm)
         recovered = self.decompress(y, cb, cr)

@@ -9,4 +9,6 @@ class Identity(nn.Module):
         super(Identity, self).__init__()
 
     def forward(self, noised_and_cover, cover_image=None):
+        print("Identity")
+        self.name = "Identity"
         return noised_and_cover

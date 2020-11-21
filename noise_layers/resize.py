@@ -19,6 +19,7 @@ class Resize(nn.Module):
 
     def forward(self, noised_image, cover_image=None):
         print("Resize Attack Added")
+        self.name = "Resize"
         #resize_ratio = random_float(self.resize_ratio_min, self.resize_ratio_max)
 
         resize_ratio = 0.5

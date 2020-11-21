@@ -11,17 +11,10 @@ class Gaussian(nn.Module):
     def __init__(self, config=GlobalConfig()):
         super(Gaussian, self).__init__()
         self.config = config
-        self.device = config.device
 
     def forward(self, tensor, cover_image=None, mean=0, stddev=0.1):
         print("Gaussian Attack Added")
-        noise = torch.nn.init.normal_(torch.Tensor(tensor.size()).to(self.device), mean, stddev)
+        self.name="Gaussian"
+        noise = torch.nn.init.normal_(torch.Tensor(tensor.size()).cuda(), mean, stddev)
         return tensor + noise
 
-
-# def gaussian(tensor, mean=0, stddev=0.1):
-#     '''Adds random noise to a tensor.'''
-#
-#     noise = torch.nn.init.normal_(torch.Tensor(tensor.size()).to(device), mean, stddev)
-#
-#     return tensor + noise

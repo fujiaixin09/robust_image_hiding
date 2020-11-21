@@ -1,6 +1,6 @@
 import torch.nn as nn
 import numpy as np
-
+import torch.nn.functional as F
 
 def random_float(min, max):
     """
@@ -51,7 +51,7 @@ class Crop(nn.Module):
     Randomly crops the image from top/bottom and left/right. The amount to crop is controlled by parameters
     heigth_ratio_range and width_ratio_range
     """
-    def __init__(self, height_ratio_range, width_ratio_range):
+    def __init__(self, height_ratio_range=(0.7,1), width_ratio_range=(0.7,1)):
         """
 
         :param height_ratio_range:
@@ -60,27 +60,39 @@ class Crop(nn.Module):
         super(Crop, self).__init__()
         self.height_ratio_range = height_ratio_range
         self.width_ratio_range = width_ratio_range
+        self.h_start, self.h_end, self.w_start, self.w_end = None,None,None,None
+        self.bool = False
 
     def get_random_rectangle_inside(self, noised_image):
         return get_random_rectangle_inside(noised_image, self.height_ratio_range, self.width_ratio_range)
 
 
-    def forward(self, noised_image, shape=None):
+    def forward(self, noised_image, cover_image=None):
+
         # noised_image = noised_and_cover[0]
         # crop_rectangle is in form (from, to) where @from and @to are 2D points -- (height, width)
-        if shape is None:
-            h_start, h_end, w_start, w_end, ratio = get_random_rectangle_inside(noised_image, self.height_ratio_range, self.width_ratio_range)
+        if self.h_start is None:
+            self.h_start, self.h_end, self.w_start, self.w_end, _ = get_random_rectangle_inside(noised_image, self.height_ratio_range, self.width_ratio_range)
         else:
-            h_start, h_end, w_start, w_end, _ = shape
-        noised_image = noised_image[
-               :,
-               :,
-               h_start: h_end,
-               w_start: w_end].clone()
-        # noised_and_cover[0] = noised_image[
-        #        :,
-        #        :,
-        #        h_start: h_end,
-        #        w_start: w_end].clone()
-        # print("Crop area: [{0}:{1},{2}:{3}],ratio:{4}".format( h_start, h_end, w_start, w_end,ratio))
-        return noised_image
+            self.h_start = int(self.h_start/4)
+            self.h_end = int(self.h_end / 4)
+            self.w_start = int(self.w_start / 4)
+            self.w_end = int(self.w_end / 4)
+
+        noised_image = noised_image[:,:,self.h_start: self.h_end,self.w_start: self.w_end].clone()
+
+        resize_back = F.interpolate(
+            noised_image,
+            size=[cover_image.shape[2],cover_image.shape[3]],
+            recompute_scale_factor=True,
+            mode='nearest')
+
+
+
+        print("Crop Attack Added. {}".format(self.bool))
+        self.name = "Crop"
+        if self.bool:
+            self.h_start, self.h_end, self.w_start, self.w_end = None,None,None,None
+        self.bool = not self.bool
+
+        return resize_back

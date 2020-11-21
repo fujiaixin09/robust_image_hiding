@@ -63,7 +63,7 @@ class mainClass:
     # ------------------------------------ Begin ---------------------------------------
     # Creates net object
     def run(self):
-        self.net.load_model("./checkpoints/Epoch N1 Batch 8191.pth.tar")
+        self.net.load_model("./checkpoints/Epoch N1 Batch 4095.pth.tar")
         for epoch in range(self.config.num_epochs):
             another_iterator = iter(self.another_loader)
             for idx, train_batch in enumerate(self.train_loader):
@@ -74,48 +74,53 @@ class mainClass:
 
 
                 # train_tag = tag.cuda()
-                losses, images = self.net.train_on_batch(self.train_cover, self.another)
+                losses, images, name = self.net.train_on_batch(self.train_cover, self.another)
                 str = 'Net 1 Epoch {0}/{1} Training: Batch {2}/{3}. {4}' \
                     .format(epoch, self.config.num_epochs, idx + 1, len(self.train_loader), losses)
                 print(str)
-                marked, extracted, Residual = images
+                marked, extracted, Residual, attacked = images
                 if idx % 1024 == 1023:
                     self.net.save_model({
                         'epoch': epoch + 1,
                         'arch': self.config.architecture,
                         'encoder_state_dict': self.net.encoder.state_dict(),
                         'decoder_state_dict': self.net.decoder.state_dict(),
-                        'discriminator_state_dict': self.net.discriminator.state_dict(),
-                        'discriminatorB_state_dict': self.net.discriminator_B.state_dict(),
+                        'discriminator_patchRecovery_state_dict': self.net.discriminator_patchRecovery.state_dict(),
+                        'discriminator_patchHidden_state_dict': self.net.discriminator_patchHidden.state_dict(),
                     },filename='./checkpoints/Epoch N{0} Batch {1}.pth.tar'.format((epoch + 1),idx))
                 if idx % 128 == 127:
                     for i in range(marked.shape[0]):
                         utils.save_images(watermarked_images=marked[i].cpu(),
-                                          filename='./Images/marked/epoch-{0}-marked-batch-{1}-{2}.bmp'.format(epoch, idx, i),
+                                          filename='./Images/marked/epoch-{0}-marked-batch-{1}-{2}-{3}.bmp'.format(epoch, idx, i, name),
                                          std=self.config.std,
                                          mean=self.config.mean)
                         utils.save_images(watermarked_images=extracted[i].cpu(),
-                                          filename='./Images/extracted/epoch-{0}-extracted-batch-{1}-{2}.bmp'.format(epoch, idx, i),
+                                          filename='./Images/extracted/epoch-{0}-extracted-batch-{1}-{2}-{3}.bmp'.format(epoch, idx, i, name),
                                           std=self.config.std,
                                           mean=self.config.mean)
                         utils.save_images(watermarked_images=self.another[i].cpu(),
-                                          filename='./Images/water/epoch-{0}-water-batch-{1}-{2}.bmp'.format(
-                                              epoch, idx, i),
+                                          filename='./Images/water/epoch-{0}-water-batch-{1}-{2}-{3}.bmp'.format(
+                                              epoch, idx, i, name),
                                           std=self.config.std,
                                           mean=self.config.mean)
                         utils.save_images(watermarked_images=self.train_cover[i].cpu(),
-                                          filename='./Images/cover/epoch-{0}-cover-batch-{1}-{2}.bmp'.format(
-                                              epoch, idx, i),
+                                          filename='./Images/cover/epoch-{0}-cover-batch-{1}-{2}-{3}.bmp'.format(
+                                              epoch, idx, i, name),
+                                          std=self.config.std,
+                                          mean=self.config.mean)
+                        utils.save_images(watermarked_images=attacked[i].cpu(),
+                                          filename='./Images/attacked/epoch-{0}-attacked-batch-{1}-{2}-{3}.bmp'.format(
+                                              epoch, idx, i, name),
                                           std=self.config.std,
                                           mean=self.config.mean)
                         utils.save_images(watermarked_images=Residual[i].cpu(),
-                                          filename='./Images/residual/epoch-{0}-residual-batch-{1}-{2}.bmp'.format(
-                                              epoch, idx, i))
+                                          filename='./Images/residual/epoch-{0}-residual-batch-{1}-{2}-{3}.bmp'.format(
+                                              epoch, idx, i, name))
                     print("Saved Images Successfully")
 
 
 if __name__ == '__main__':
-    folders = ['./Images/','./Images/cover/','./Images/extracted/','./Images/marked/','./Images/residual/','./Images/water/']
+    folders = ['./Images/','./Images/cover/','./Images/extracted/','./Images/marked/','./Images/residual/','./Images/water/','./Images/attacked/']
     for folder in folders:
         if not os.path.exists(folder):
             os.mkdir(folder)
