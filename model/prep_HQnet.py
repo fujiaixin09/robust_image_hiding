@@ -15,66 +15,62 @@ class pureUnet(nn.Module):
         # input channel: 3, output channel: 96
         """Features with Kernel Size 7---->channel:WaterF*2 """
         self.downsample_8 = nn.Sequential(
-            nn.Conv2d(3, CoverF, kernel_size=4, stride=1, dilation=1, padding=1),
+            nn.Conv2d(3, CoverF, kernel_size=3, stride=1, dilation=1, padding=1),
             nn.ELU(inplace=False),
-            SingleConv(CoverF, out_channels=CoverF, kernel_size=4, stride=1, dilation=1, padding=2),
+            SingleConv(CoverF, out_channels=CoverF, kernel_size=3, stride=1, dilation=1, padding=1),
         )
         # 128
         self.downsample_7 = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(CoverF, out_channels=CoverF * 2, kernel_size=4, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF * 2, out_channels=CoverF * 2, kernel_size=4, stride=1, dilation=1, padding=2)
+            SingleConv(CoverF, out_channels=CoverF * 2, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF * 2, out_channels=CoverF * 2, kernel_size=3, stride=1, dilation=1, padding=1)
         )
         # 64
         self.downsample_6 = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(CoverF * 2, out_channels=CoverF * 4, kernel_size=4, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF * 4, out_channels=CoverF * 4, kernel_size=4, stride=1, dilation=1, padding=2)
+            SingleConv(CoverF * 2, out_channels=CoverF * 4, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF * 4, out_channels=CoverF * 4, kernel_size=3, stride=1, dilation=1, padding=1)
         )
         # 32
         self.downsample_5 = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(CoverF * 4, out_channels=CoverF * 8, kernel_size=4, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF * 8, out_channels=CoverF * 8, kernel_size=4, stride=1, dilation=1, padding=2)
+            SingleConv(CoverF * 4, out_channels=CoverF * 8, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF * 8, out_channels=CoverF * 8, kernel_size=3, stride=1, dilation=1, padding=1)
         )
         # 16
         self.downsample_4 = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(CoverF * 8, out_channels=CoverF * 16, kernel_size=4, stride=1, dilation=1, padding=1),
-            SingleConv(CoverF * 16, out_channels=CoverF * 16, kernel_size=4, stride=1, dilation=1, padding=2)
+            SingleConv(CoverF * 8, out_channels=CoverF * 8, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF * 8, out_channels=CoverF * 8, kernel_size=3, stride=1, dilation=1, padding=1)
         )
         # 16以下的卷积用4层conv
         self.fullConv = nn.Sequential(
-            SingleConv(CoverF * 16, out_channels=CoverF * 16, kernel_size=5, stride=1,
-                       dilation=1, padding=2),
-            SingleConv(CoverF * 16, out_channels=CoverF * 16, kernel_size=5, stride=1,
-                       dilation=1, padding=2),
-            SingleConv(CoverF * 16, out_channels=CoverF * 16, kernel_size=5, stride=1, dilation=1,
-                       padding=2),
-            SingleConv(CoverF * 16, out_channels=CoverF * 16, kernel_size=5, stride=1, dilation=1, padding=2)
+            SingleConv(CoverF * 8, out_channels=CoverF * 8, kernel_size=5, stride=1,dilation=1, padding=2),
+            SingleConv(CoverF * 8, out_channels=CoverF * 8, kernel_size=5, stride=1,dilation=1, padding=2),
+            SingleConv(CoverF * 8, out_channels=CoverF * 8, kernel_size=5, stride=1, dilation=1,padding=2),
+            SingleConv(CoverF * 8, out_channels=CoverF * 8, kernel_size=5, stride=1, dilation=1, padding=2)
         )
+        self.pureUpsamle = PureUpsampling(scale=2)
         # 32
-        self.Upsamle4_3 = nn.Sequential(
-            PureUpsampling(scale=2),
-            SingleConv(CoverF * 16, out_channels=CoverF * 8, kernel_size=3, stride=1, dilation=1, padding=1)
-        )
+        # self.Upsamle4_3 = nn.Sequential(
+        #     PureUpsampling(scale=2),
+        #     SingleConv(CoverF * 16, out_channels=CoverF * 8, kernel_size=3, stride=1, dilation=1, padding=1)
+        # )
         self.upsample4_3 = nn.Sequential(
-            SingleConv(CoverF * 8 * 2, out_channels=CoverF * 8, kernel_size=4, stride=1, dilation=1,
-                       padding=1),
-            SingleConv(CoverF * 8, out_channels=CoverF * 8, kernel_size=4, stride=1, dilation=1, padding=2)
-        )
-        # 64
-        self.Upsamle3_3 = nn.Sequential(
-            PureUpsampling(scale=2),
+            SingleConv(CoverF * 8 * 2, out_channels=CoverF * 8, kernel_size=3, stride=1, dilation=1, padding=1),
             SingleConv(CoverF * 8, out_channels=CoverF * 4, kernel_size=3, stride=1, dilation=1, padding=1)
         )
+        # 64
+        # self.Upsamle3_3 = nn.Sequential(
+        #     PureUpsampling(scale=2),
+        #     SingleConv(CoverF * 8, out_channels=CoverF * 4, kernel_size=3, stride=1, dilation=1, padding=1)
+        # )
         self.upsample3_3 = nn.Sequential(
-            SingleConv(CoverF * 4 * 2, out_channels=CoverF * 4, kernel_size=4, stride=1, dilation=1,
-                       padding=1),
-            SingleConv(CoverF * 4, out_channels=CoverF * 4, kernel_size=4, stride=1, dilation=1, padding=2)
+            SingleConv(CoverF * 4 * 2, out_channels=CoverF * 4, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(CoverF * 4, out_channels=CoverF * 2, kernel_size=3, stride=1, dilation=1, padding=1)
         )
         self.final64 = nn.Sequential(
-            nn.Conv2d(CoverF * 4, 1, kernel_size=1, padding=0),
+            nn.Conv2d(CoverF * 2, 1, kernel_size=1, padding=0),
             nn.Tanh()
         )
         # # 128
@@ -83,8 +79,8 @@ class pureUnet(nn.Module):
         #     SingleConv(CoverF * 4, out_channels=CoverF * 2, kernel_size=3, stride=1, dilation=1, padding=1)
         # )
         # self.upsample2_3 = nn.Sequential(
-        #     SingleConv(CoverF * 2 * 2, out_channels=CoverF * 2, kernel_size=4, stride=1, dilation=1, padding=1),
-        #     SingleConv(CoverF * 2, out_channels=CoverF * 2, kernel_size=4, stride=1, dilation=1, padding=2)
+        #     SingleConv(CoverF * 2 * 2, out_channels=CoverF * 2, kernel_size=3, stride=1, dilation=1, padding=1),
+        #     SingleConv(CoverF * 2, out_channels=CoverF * 2, kernel_size=3, stride=1, dilation=1, padding=1)
         # )
         # # 256
         # self.Upsamle1_3 = nn.Sequential(
@@ -92,8 +88,8 @@ class pureUnet(nn.Module):
         #     SingleConv(CoverF * 2, out_channels=CoverF, kernel_size=3, stride=1, dilation=1, padding=1)
         # )
         # self.upsample1_3 = nn.Sequential(
-        #     SingleConv(CoverF * 2, out_channels=CoverF, kernel_size=4, stride=1, dilation=1, padding=1),
-        #     SingleConv(CoverF, out_channels=CoverF, kernel_size=4, stride=1, dilation=1, padding=2)
+        #     SingleConv(CoverF * 2, out_channels=CoverF, kernel_size=3, stride=1, dilation=1, padding=1),
+        #     SingleConv(CoverF, out_channels=CoverF, kernel_size=3, stride=1, dilation=1, padding=1)
         # )
         # self.final256 = nn.Sequential(
         #     nn.Conv2d(CoverF, 3, kernel_size=1, padding=0),
@@ -115,11 +111,11 @@ class pureUnet(nn.Module):
         up5 = self.fullConv(down4)
 
         # 32
-        up4_up = self.Upsamle4_3(up5)
+        up4_up = self.pureUpsamle(up5)
         up4_cat = torch.cat((down5, up4_up), 1)
         up4 = self.upsample4_3(up4_cat)
         # 64
-        up3_up = self.Upsamle3_3(up4)
+        up3_up = self.pureUpsamle(up4)
         up3_cat = torch.cat((down6, up3_up), 1)
         up3 = self.upsample3_3(up3_cat)
         up0 = self.final64(up3)

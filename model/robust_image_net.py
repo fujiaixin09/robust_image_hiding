@@ -10,8 +10,8 @@ from noise_layers.gaussian import Gaussian
 from noise_layers.dropout import Dropout
 from noise_layers.resize import Resize
 from config import GlobalConfig
-from model.prep_RInet import UnetInception
-from model.prep_HQnet import pureUnet
+from model.prep_RInet_original import UnetInception
+from model.prep_HQnet_original import Prep_pureUnet
 import numpy as np
 from model.NLayerDiscriminator import NLayerDiscriminator
 from loss.GANloss import GANLoss
@@ -30,7 +30,7 @@ class RobustImageNet:
         self.criterionGAN = GANLoss().cuda()
 
         self.encoder = UnetInception(config=config).cuda()
-        self.decoder = pureUnet(config=config).cuda()
+        self.decoder = Prep_pureUnet(config=config).cuda()
         if torch.cuda.device_count() > 1:
             self.encoder = torch.nn.DataParallel(self.encoder)
         if torch.cuda.device_count() > 1:
@@ -88,6 +88,7 @@ class RobustImageNet:
         # Defined the labels used for training the discriminator/adversarial loss
         self.cover_label = 1
         self.encoded_label = 0
+        self.roundCount = 0.0
 
 
     def train_on_batch(self, Cover, Water):
@@ -102,8 +103,9 @@ class RobustImageNet:
         self.decoder.train()
         self.discriminator.train()
         self.discriminator_B.train()
-        # for param in self.classification_net.parameters():
-        #     param.requires_grad = False
+        self.roundCount += batch_size / (118287)
+        if self.roundCount > 1:
+            self.roundCount = 1
         with torch.enable_grad():
             """ Run, Train the discriminator"""
             self.optimizer_encoder.zero_grad()
@@ -154,9 +156,13 @@ class RobustImageNet:
             # self.optimizer_discrim_patchRecovery.step()
 
             """Losses"""
-            loss_marked = self.getVggLoss(Marked, Cover)
+            loss_marked_vgg = self.getVggLoss(Marked, Cover)
+            loss_marked_psnr =  self.mse_loss(Marked, Cover)
+            loss_marked = loss_marked_psnr+loss_marked_vgg
             # loss_recovery = self.mse_loss(Extracted, Water)
-            loss_recovery = self.getVggLoss(Extracted_3, Water_3)
+            loss_recovery_vgg = self.getVggLoss(Extracted_3, Water_3)
+            loss_recovery_psnr = self.mse_loss(Extracted, Water)
+            loss_recovery = loss_recovery_psnr+loss_recovery_vgg
 
             # g_loss_adv_enc = self.criterionGAN(self.discriminator_patchHidden(Marked), True)
             # g_loss_adv_recovery = self.criterionGAN(self.discriminator_patchRecovery(Extracted), True)
@@ -166,14 +172,29 @@ class RobustImageNet:
             d_on_encoded_for_ext = self.discriminator(Extracted_3)
             g_loss_adv_ext = self.bce_with_logits_loss(d_on_encoded_for_ext, g_target_label_encoded)
 
-            # param = -0.125*loss_marked+1.1875
-            # param = max(0.25, param)
-            # param = min(1, param)
-            # print("Param: {0:.4f}".format(param))
-            param = 0.7
-            loss_enc_dec = param * (loss_recovery + g_loss_adv_ext * self.config.hyper_discriminator)
+            param = -0.25*loss_marked+1.5
+            param = max(0.25, param)
+            param = min(0.5, param)
 
-            loss_enc_dec += loss_marked + g_loss_adv_enc * self.config.hyper_discriminator
+            # param = 0.7
+            hyper_discriminator = 0.01+0.99*self.roundCount
+            print("Param: {0:.4f}, hyper_discriminator:{1:.6f}".format(param,hyper_discriminator))
+            loss_enc_dec = param * (loss_recovery)
+            loss_enc_dec += param * (g_loss_adv_ext * hyper_discriminator)
+
+            loss_enc_dec += loss_marked
+            loss_enc_dec += g_loss_adv_enc * hyper_discriminator
+
+            """penalty on residual"""
+            Marked_d = utils.denormalize_batch(Marked, self.config.std, self.config.mean)
+            Cover_d = utils.denormalize_batch(Cover, self.config.std, self.config.mean)
+            Extracted_d = utils.denormalize_batch(Extracted, self.config.std, self.config.mean)
+            Water_d = utils.denormalize_batch(Water, self.config.std, self.config.mean)
+            Residual = torch.abs(Marked_d - Cover_d)
+
+            loss_residual = self.mse_loss(Residual,torch.zeros_like(Residual))
+            loss_enc_dec += loss_residual * 0.1
+
 
             loss_enc_dec.backward()
             self.optimizer_encoder.step()
@@ -183,14 +204,10 @@ class RobustImageNet:
                 'loss_marked': loss_marked.item(),
                 'loss_recovery': loss_recovery.item(),
                 'g_loss_adv_enc': g_loss_adv_enc.item(),
-                'g_loss_adv_recovery': g_loss_adv_ext.item()
+                'g_loss_adv_recovery': g_loss_adv_ext.item(),
+                'loss_residual': loss_residual.item()
             }
 
-            Marked_d = utils.denormalize_batch(Marked, self.config.std, self.config.mean)
-            Cover_d = utils.denormalize_batch(Cover, self.config.std, self.config.mean)
-            Extracted_d = utils.denormalize_batch(Extracted, self.config.std, self.config.mean)
-            Water_d = utils.denormalize_batch(Water, self.config.std, self.config.mean)
-            Residual = torch.abs(Marked_d - Cover_d)
 
             # PSNR
             print("PSNR:(Hidden Cover) {}".format(
@@ -205,17 +222,22 @@ class RobustImageNet:
 
 
     def save_model(self, state, filename='./checkpoint.pth.tar'):
+        state['roundCount']=self.roundCount
         torch.save(state, filename)
         print("Successfully Saved: " + filename)
 
     def load_model(self, filename):
         print("Reading From: " + filename)
         checkpoint = torch.load(filename)
+        if 'roundCount' in checkpoint:
+            self.roundCount = checkpoint['roundCount']
         self.encoder.load_state_dict(checkpoint['encoder_state_dict'])
         print(self.encoder)
         self.decoder.load_state_dict(checkpoint['decoder_state_dict'])
         print(self.encoder)
-        print("Successfully Loaded: " + filename)
+        self.discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
+        self.discriminator_B.load_state_dict(checkpoint['discriminatorB_state_dict'])
+        print("Successfully Loaded All modes in: " + filename)
 
     def getVggLoss(self, marked, cover):
         vgg_on_cov = self.vgg_loss(cover)

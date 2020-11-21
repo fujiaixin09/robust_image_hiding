@@ -13,7 +13,7 @@ class GlobalConfig():
         self.Water_Width = 64
         self.temperature = 10
         self.hyper = 2
-        self.hyper_discriminator = 1
+        self.hyper_discriminator = 0.01
         self.attack_portion = 0.2
         self.crop_size = 0.2
         self.encoder_features = 64

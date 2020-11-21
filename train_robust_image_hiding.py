@@ -63,6 +63,7 @@ class mainClass:
     # ------------------------------------ Begin ---------------------------------------
     # Creates net object
     def run(self):
+        self.net.load_model("./checkpoints/Epoch N1 Batch 8191.pth.tar")
         for epoch in range(self.config.num_epochs):
             another_iterator = iter(self.another_loader)
             for idx, train_batch in enumerate(self.train_loader):
@@ -83,8 +84,9 @@ class mainClass:
                         'epoch': epoch + 1,
                         'arch': self.config.architecture,
                         'encoder_state_dict': self.net.encoder.state_dict(),
-                        'decoder_state_dict': self.net.encoder.state_dict(),
-                        # 'optimizer_encoder': self.net.optimizer_encoder.state_dict(),
+                        'decoder_state_dict': self.net.decoder.state_dict(),
+                        'discriminator_state_dict': self.net.discriminator.state_dict(),
+                        'discriminatorB_state_dict': self.net.discriminator_B.state_dict(),
                     },filename='./checkpoints/Epoch N{0} Batch {1}.pth.tar'.format((epoch + 1),idx))
                 if idx % 128 == 127:
                     for i in range(marked.shape[0]):
