@@ -30,11 +30,12 @@ class UnetInception(nn.Module):
             SingleConv(32, out_channels=64, kernel_size=3, stride=1, dilation=1, padding=1),
             SingleConv(64, out_channels=64, kernel_size=3, stride=1, dilation=1, padding=1)
         )
-        # self.downsample_7_Secret = nn.Sequential(
-        #     PureUpsampling(scale=1 / 2),
-        #     SingleConv(32, out_channels=64, kernel_size=3, stride=1, dilation=1, padding=1),
-        #     SingleConv(64, out_channels=64, kernel_size=3, stride=1, dilation=1, padding=1)
-        # )
+        self.pureDownsamle = PureUpsampling(scale=1/2)
+        self.downsample_7_Secret = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=3, stride=1, dilation=1, padding=1),
+            nn.ELU(inplace=True),
+            SingleConv(16, out_channels=16, kernel_size=3, stride=1, dilation=1, padding=1),
+        )
         # 64
         self.downsample_6_Cover = nn.Sequential(
             PureUpsampling(scale=1 / 2),
@@ -45,6 +46,11 @@ class UnetInception(nn.Module):
             nn.Conv2d(1, 32, kernel_size=3, stride=1, dilation=1, padding=1),
             nn.ELU(inplace=True),
             SingleConv(32, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1),
+        )
+        self.downsample_6_Secret_added = nn.Sequential(
+            PureUpsampling(scale=1 / 2),
+            SingleConv(16, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(32, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1)
         )
         # 32
         self.downsample_5_Cover = nn.Sequential(
@@ -102,16 +108,18 @@ class UnetInception(nn.Module):
         )
 
 
-    def forward(self, cover, secret):
+    def forward(self, cover, secret, roundSum=1):
         # 256
         down8 = self.downsample_8_Cover(cover)
         # down8_secret = self.downsample_8_Secret(secret)
         # 128
         down7 = self.downsample_7_Cover(down8)
-        # down7_secret = self.downsample_7_Secret(down8_secret)
+        down7_secret_added = self.downsample_7_Secret(secret)
         # 64
         down6 = self.downsample_6_Cover(down7)
-        down6_secret = self.downsample_6_Secret(secret)
+        down6_secret_original = self.downsample_6_Secret(self.pureDownsamle(secret))
+        down6_secret_added = self.downsample_6_Secret_added(down7_secret_added)
+        down6_secret = down6_secret_original*roundSum+down6_secret_added*(1-roundSum)
         # 32
         down5 = self.downsample_5_Cover(down6)
         down5_secret = self.downsample_5_Secret(down6_secret)

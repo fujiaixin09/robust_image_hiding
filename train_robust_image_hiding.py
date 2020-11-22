@@ -34,8 +34,8 @@ class mainClass:
                 self.config.TRAIN_PATH,
                 train_transform), batch_size=self.config.train_batch_size, num_workers=4,
             pin_memory=True, shuffle=True, drop_last=True)
-        # Creates another set
-        another_transform = transforms.Compose([
+        # Creates water set
+        train_water_transform = transforms.Compose([
             transforms.Resize(self.config.Water_Width),
             transforms.RandomCrop(self.config.Water_Width),
             transforms.Grayscale(),
@@ -43,10 +43,38 @@ class mainClass:
             transforms.Normalize(mean=self.config.mean[0],
                                  std=self.config.std[0])
         ])
-        self.another_loader = torch.utils.data.DataLoader(
+        self.train_water_loader = torch.utils.data.DataLoader(
             datasets.ImageFolder(
                 self.config.TRAIN_PATH,
-                another_transform), batch_size=self.config.train_batch_size, num_workers=4,
+                train_water_transform), batch_size=self.config.train_batch_size, num_workers=4,
+            pin_memory=True, shuffle=True, drop_last=True)
+
+        # Creates test set
+        test_transform = transforms.Compose([
+            transforms.Resize(self.config.Width),
+            transforms.RandomCrop(self.config.Width),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=self.config.mean,
+                                 std=self.config.std)
+        ])
+        self.test_loader = torch.utils.data.DataLoader(
+            datasets.ImageFolder(
+                self.config.TEST_PATH,
+                test_transform), batch_size=1, num_workers=4,
+            pin_memory=True, shuffle=True, drop_last=True)
+        # Creates water test set
+        test_water_transform = transforms.Compose([
+            transforms.Resize(self.config.Water_Width),
+            transforms.RandomCrop(self.config.Water_Width),
+            transforms.Grayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=self.config.mean[0],
+                                 std=self.config.std[0])
+        ])
+        self.test_water_loader = torch.utils.data.DataLoader(
+            datasets.ImageFolder(
+                self.config.TEST_PATH,
+                test_water_transform), batch_size=1, num_workers=4,
             pin_memory=True, shuffle=True, drop_last=True)
 
         # self.train_dataset = MyDataset(root=self.config.TRAIN_PATH,filename=self.config.TAG_PATH,mean=self.config.mean,std=self.config.std)
@@ -58,24 +86,27 @@ class mainClass:
         #                                     shuffle=True, num_workers=4)
 
         self.net = RobustImageNet(config=self.config)
-        self.train_cover, self.another = None, None
+        self.train_cover, self.train_water = None, None
+        self.test_cover, self.test_water = None, None
 
     # ------------------------------------ Begin ---------------------------------------
     # Creates net object
-    def run(self):
-        self.net.load_model("./checkpoints/Epoch N1 Batch 4095.pth.tar")
-        for epoch in range(self.config.num_epochs):
-            another_iterator = iter(self.another_loader)
+    def run(self,Epoch):
+        self.net.load_model("./checkpoints/Epoch N1 Batch 14335.pth.tar")
+        train_water_iterator = iter(self.train_water_loader)
+        test_iterator = iter(self.test_loader)
+        test_water_iterator = iter(self.test_water_loader)
+        for epoch_1 in range(self.config.num_epochs):
+            epoch = epoch_1 + Epoch
             for idx, train_batch in enumerate(self.train_loader):
                 self.train_cover, _ = train_batch
                 self.train_cover = self.train_cover.cuda()
-                self.another, _ = another_iterator.__next__()
-                self.another = self.another.cuda()
-
+                self.train_water, _ = train_water_iterator.__next__()
+                self.train_water = self.train_water.cuda()
 
                 # train_tag = tag.cuda()
-                losses, images, name = self.net.train_on_batch(self.train_cover, self.another)
-                str = 'Net 1 Epoch {0}/{1} Training: Batch {2}/{3}. {4}' \
+                losses, images, name = self.net.train_on_batch(self.train_cover, self.train_water)
+                str = 'Training Epoch {0}/{1} Batch {2}/{3}. {4}' \
                     .format(epoch, self.config.num_epochs, idx + 1, len(self.train_loader), losses)
                 print(str)
                 marked, extracted, Residual, attacked = images
@@ -98,7 +129,7 @@ class mainClass:
                                           filename='./Images/extracted/epoch-{0}-extracted-batch-{1}-{2}-{3}.bmp'.format(epoch, idx, i, name),
                                           std=self.config.std,
                                           mean=self.config.mean)
-                        utils.save_images(watermarked_images=self.another[i].cpu(),
+                        utils.save_images(watermarked_images=self.train_water[i].cpu(),
                                           filename='./Images/water/epoch-{0}-water-batch-{1}-{2}-{3}.bmp'.format(
                                               epoch, idx, i, name),
                                           std=self.config.std,
@@ -118,9 +149,53 @@ class mainClass:
                                               epoch, idx, i, name))
                     print("Saved Images Successfully")
 
+                    if self.config.conductTest:
+                        """Test"""
+                        self.test_cover, _ = test_iterator.__next__()
+                        self.test_cover = self.test_cover.cuda()
+                        self.test_water, _ = test_water_iterator.__next__()
+                        self.test_water = self.test_water.cuda()
+                        for attack_num in range(len(self.net.noise_layers)):
+                            losses, images, name = self.net.eval_on_batch(self.test_cover, self.test_water, attack_num=attack_num)
+                            str = '--Test-- Epoch {0}/{1} Batch {2}/{3}. {4}' \
+                                .format(epoch, self.config.num_epochs, idx + 1, len(self.test_loader), losses)
+                            print(str)
+                            marked, extracted, Residual, attacked = images
+                            utils.save_images(watermarked_images=marked[0].cpu(),
+                                              filename='./Test/marked/epoch-{0}-marked-batch-{1}-{2}-{3}.bmp'.format(
+                                                  epoch, idx, 0, name),
+                                              std=self.config.std,
+                                              mean=self.config.mean)
+                            utils.save_images(watermarked_images=extracted[0].cpu(),
+                                              filename='./Test/extracted/epoch-{0}-extracted-batch-{1}-{2}-{3}.bmp'.format(
+                                                  epoch, idx, 0, name),
+                                              std=self.config.std,
+                                              mean=self.config.mean)
+                            utils.save_images(watermarked_images=self.test_water[0].cpu(),
+                                              filename='./Test/water/epoch-{0}-water-batch-{1}-{2}-{3}.bmp'.format(
+                                                  epoch, idx, 0, name),
+                                              std=self.config.std,
+                                              mean=self.config.mean)
+                            utils.save_images(watermarked_images=self.test_cover[0].cpu(),
+                                              filename='./Test/cover/epoch-{0}-cover-batch-{1}-{2}-{3}.bmp'.format(
+                                                  epoch, idx, 0, name),
+                                              std=self.config.std,
+                                              mean=self.config.mean)
+                            utils.save_images(watermarked_images=attacked[0].cpu(),
+                                              filename='./Test/attacked/epoch-{0}-attacked-batch-{1}-{2}-{3}.bmp'.format(
+                                                  epoch, idx, 0, name),
+                                              std=self.config.std,
+                                              mean=self.config.mean)
+                            utils.save_images(watermarked_images=Residual[0].cpu(),
+                                              filename='./Test/residual/epoch-{0}-residual-batch-{1}-{2}-{3}.bmp'.format(
+                                                  epoch, idx, 0, name))
+
+                        """Test End"""
+
 
 if __name__ == '__main__':
     folders = ['./Images/','./Images/cover/','./Images/extracted/','./Images/marked/','./Images/residual/','./Images/water/','./Images/attacked/']
+    folders += ['./Test/', './Test/cover/', './Test/extracted/', './Test/marked/', './Test/residual/','./Test/water/', './Test/attacked/']
     for folder in folders:
         if not os.path.exists(folder):
             os.mkdir(folder)
@@ -128,5 +203,6 @@ if __name__ == '__main__':
 
 
     main_class = mainClass()
-    main_class.run()
+    for i in range(100):
+        main_class.run(i)
 

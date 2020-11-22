@@ -66,12 +66,15 @@ class Prep_pureUnet(nn.Module):
             nn.Conv2d(128, 1, kernel_size=1, padding=0),
             nn.Tanh()
         )
-        # # 128
-        #
-        # self.upsample2_3 = nn.Sequential(
-        #     SingleConv(256, out_channels=128, kernel_size=3, stride=1, dilation=1, padding=1),
-        #     SingleConv(128, out_channels=64, kernel_size=3, stride=1, dilation=1, padding=1)
-        # )
+        # 128
+        self.upsample2_3 = nn.Sequential(
+            SingleConv(256, out_channels=128, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(128, out_channels=64, kernel_size=3, stride=1, dilation=1, padding=1)
+        )
+        self.final128 = nn.Sequential(
+            nn.Conv2d(64, 1, kernel_size=1, padding=0),
+            nn.Tanh()
+        )
         # # 256
         #
         # self.upsample1_3 = nn.Sequential(
@@ -85,7 +88,7 @@ class Prep_pureUnet(nn.Module):
         # )
 
 
-    def forward(self, p):
+    def forward(self, p, roundSum):
         # 256
         down8 = self.downsample_8(p)
         # 128
@@ -105,11 +108,14 @@ class Prep_pureUnet(nn.Module):
         up3_up = self.pureUpsamle(up4)
         up3_cat = torch.cat((down6, up3_up), 1)
         up3 = self.upsample3_3(up3_cat)
-        out = self.final64(up3)
-        # # 128
-        # up2_up = self.pureUpsamle(up3)
-        # up2_cat = torch.cat((down7, up2_up), 1)
-        # up2 = self.upsample2_3(up2_cat)
+        out_64 = self.final64(up3)
+        # 128
+        up2_up = self.pureUpsamle(up3)
+        up2_cat = torch.cat((down7, up2_up), 1)
+        up2 = self.upsample2_3(up2_cat)
+        out_128 = self.final128(up2)
+
+        out = self.pureUpsamle(out_64)*roundSum+out_128*(1-roundSum)
         # # 256
         # up1_up = self.pureUpsamle(up2)
         # up1_cat = torch.cat((down8, up1_up), 1)

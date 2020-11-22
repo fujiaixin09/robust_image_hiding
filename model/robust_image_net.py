@@ -50,21 +50,21 @@ class RobustImageNet:
         self.jpeg_layer_50 = DiffJPEG(256, 256, quality=50, differentiable=True).cuda()
         self.gaussian = Gaussian().cuda()
         self.gaussian_blur = GaussianBlur().cuda()
-        self.dropout = Dropout(self.config,keep_ratio_range=(0.5,0.75)).cuda()
+        self.dropout = Dropout(self.config,keep_ratio_range=(0.7,1)).cuda()
         self.resize = Resize().cuda()
         self.cropout_layer = Cropout().cuda()
         self.crop_layer = Crop().cuda()
-        # self.noise_layers.append(self.jpeg_layer_80)
+        self.noise_layers.append(self.jpeg_layer_80)
         self.noise_layers.append(self.jpeg_layer_90)
         self.noise_layers.append(self.jpeg_layer_70)
-        # self.noise_layers.append(self.jpeg_layer_60)
+        self.noise_layers.append(self.jpeg_layer_60)
         self.noise_layers.append(self.jpeg_layer_50)
         self.noise_layers.append(self.gaussian)
         self.noise_layers.append(self.resize)
         self.noise_layers.append(self.dropout)
         self.noise_layers.append(self.gaussian_blur)
-        # self.noise_layers.append(self.cropout_layer)
-        # self.noise_layers.append(self.crop_layer)
+        self.noise_layers.append(self.cropout_layer)
+        self.noise_layers.append(self.crop_layer)
 
         # self.discriminator = Discriminator(self.config).cuda()
         # if torch.cuda.device_count() > 1:
@@ -84,8 +84,8 @@ class RobustImageNet:
         self.optimizer_discrim_patchHiddem = torch.optim.Adam(self.discriminator_patchHidden.parameters())
         self.optimizer_discrim_patchRecovery = torch.optim.Adam(self.discriminator_patchRecovery.parameters())
 
-        self.downsample_layer = PureUpsampling(scale=64 / 256).cuda()
-        self.upsample_layer = PureUpsampling(scale=256 / 64).cuda()
+        # self.downsample_layer = PureUpsampling(scale=64 / 256).cuda()
+        # self.upsample_layer = PureUpsampling(scale=256 / 64).cuda()
         self.bce_with_logits_loss = nn.BCEWithLogitsLoss().cuda()
         self.mse_loss = nn.MSELoss().cuda()
         self.ssim_loss = pytorch_ssim.SSIM().cuda()
@@ -95,7 +95,7 @@ class RobustImageNet:
         # Defined the labels used for training the discriminator/adversarial loss
         self.cover_label = 1
         self.encoded_label = 0
-        self.roundCount = 0.0
+        self.roundCount = 1.0
 
 
     def train_on_batch(self, Cover, Water):
@@ -112,9 +112,9 @@ class RobustImageNet:
         self.discriminator_patchRecovery.train()
         # self.discriminator.train()
         # self.discriminator_B.train()
-        self.roundCount += batch_size / (118287)
-        if self.roundCount > 1:
-            self.roundCount = 1
+        self.roundCount -= batch_size / (2*118287)
+        if self.roundCount < 0:
+            self.roundCount = 0
         with torch.enable_grad():
             """ Run, Train the discriminator"""
             self.optimizer_encoder.zero_grad()
@@ -123,7 +123,7 @@ class RobustImageNet:
             # self.optimizer_discrim_B.zero_grad()
             self.optimizer_discrim_patchHiddem.zero_grad()
             self.optimizer_discrim_patchRecovery.zero_grad()
-            Marked = self.encoder(Cover, Water)
+            Marked = self.encoder(cover=Cover, secret=Water, roundSum=self.roundCount)
             # Res = self.encoder(Cover, Water)
             # Marked = Res+Cover
             # Residual = torch.abs(Marked-Cover)
@@ -133,7 +133,7 @@ class RobustImageNet:
             if random_noise_layer is self.crop_layer:
                 Water = random_noise_layer(Water, cover_image=Water)
             # Attacked = Marked
-            Extracted = self.decoder(Attacked)
+            Extracted = self.decoder(p=Attacked,roundSum=self.roundCount)
 
             # ---------------- Train the discriminator -----------------------------
             # # train on cover
@@ -184,22 +184,24 @@ class RobustImageNet:
             # g_loss_adv_ext = self.bce_with_logits_loss(d_on_encoded_for_ext, g_target_label_encoded)
 
             if loss_marked<1:
-                param,residual_param = 1, 0
+                param,param_cover = 1, 0.7
             elif loss_marked<1.5:
-                param,residual_param=0.75,0.1
+                param,param_cover= 1, 1
             elif loss_marked<2:
-                param,residual_param=0.5,0.25
+                param,param_cover= 0.5, 1
             else:
-                param,residual_param=0.5,0.5
+                param,param_cover= 0.2, 1
+            # if random_noise_layer.name in ["Jpeg90","Jpeg80","Jpeg70","Jpeg60","Jpeg50"]:
+            #     param = 1
 
             # param = 0.7
-            hyper_discriminator = 0.1+0.9*self.roundCount
-            print("Param: {0:.4f}, hyper_discriminator:{1:.6f}, residual:{2}".format(param,hyper_discriminator,residual_param))
+            hyper_discriminator = 0.1+0.9*(1-self.roundCount)
+            print("Param: {0:.4f}, hyper_discriminator:{1:.6f}, param cover:{2}".format(param,hyper_discriminator,param_cover))
             loss_enc_dec = param * loss_recovery
             loss_enc_dec += param * (g_loss_adv_ext * hyper_discriminator)
 
-            loss_enc_dec += loss_marked
-            loss_enc_dec += g_loss_adv_enc * hyper_discriminator
+            loss_enc_dec += param_cover * loss_marked
+            loss_enc_dec += param_cover *  g_loss_adv_enc * hyper_discriminator
 
             """penalty on residual"""
             Marked_d = utils.denormalize_batch(Marked, self.config.std, self.config.mean)
@@ -236,6 +238,148 @@ class RobustImageNet:
 
             return losses, (Marked, Extracted, Residual, Attacked), random_noise_layer.name
 
+    def eval_on_batch(self, Cover, Water, attack_num=None):
+        """
+            训练方法：
+            Encoder使用Unet，固定分类网络
+            让分类网络在T=1时，分类结果为正常结果
+            T=10时，分类结果为水印序列对应结果
+        """
+        # batch_size = Cover.shape[0]
+        self.encoder.eval()
+        self.decoder.eval()
+        self.discriminator_patchHidden.eval()
+        self.discriminator_patchRecovery.eval()
+        # self.discriminator.train()
+        # self.discriminator_B.train()
+        # self.roundCount += batch_size / (118287)
+        # if self.roundCount > 1:
+        #     self.roundCount = 1
+        with torch.enable_grad():
+            """ Run, Train the discriminator"""
+            # self.optimizer_encoder.zero_grad()
+            # self.optimizer_decoder.zero_grad()
+            # self.optimizer_discrim.zero_grad()
+            # self.optimizer_discrim_B.zero_grad()
+            # self.optimizer_discrim_patchHiddem.zero_grad()
+            # self.optimizer_discrim_patchRecovery.zero_grad()
+            Marked = self.encoder(cover=Cover, secret=Water, roundSum=self.roundCount)
+            # Res = self.encoder(Cover, Water)
+            # Marked = Res+Cover
+            # Residual = torch.abs(Marked-Cover)
+            """Attack"""
+            if attack_num is None:
+                random_noise_layer = np.random.choice(self.noise_layers, 1)[0]
+            else:
+                random_noise_layer = self.noise_layers[attack_num]
+            Attacked = random_noise_layer(Marked, cover_image=Cover)
+            if random_noise_layer is self.crop_layer:
+                Water = random_noise_layer(Water, cover_image=Water)
+            # Attacked = Marked
+            Extracted = self.decoder(p=Attacked,roundSum=self.roundCount)
+
+            # ---------------- Train the discriminator -----------------------------
+            # # train on cover
+            Extracted_3 = Extracted.expand(-1, 3, -1, -1)
+            Water_3 = Water.expand(-1, 3, -1, -1)
+            # d_target_label_cover = torch.full((batch_size, 1), self.cover_label, dtype=torch.float32).cuda()
+            # d_target_label_encoded = torch.full((batch_size, 1), self.encoded_label, dtype=torch.float32).cuda()
+            # g_target_label_encoded = torch.full((batch_size, 1), self.cover_label, dtype=torch.float32).cuda()
+            # d_on_cover = self.discriminator(Cover)
+            # d_loss_on_cover = self.bce_with_logits_loss(d_on_cover, d_target_label_cover)
+            # d_loss_on_cover.backward()
+            # d_on_water = self.discriminator_B(Water_3)
+            # d_loss_on_water = self.bce_with_logits_loss(d_on_water, d_target_label_cover)
+            # d_loss_on_water.backward()
+            # # train on fake
+            # d_on_encoded = self.discriminator(Marked.detach())
+            # d_loss_on_encoded = self.bce_with_logits_loss(d_on_encoded, d_target_label_encoded)
+            # d_loss_on_encoded.backward()
+            # d_on_extracted = self.discriminator_B(Extracted_3.detach())
+            # d_loss_on_extracted = self.bce_with_logits_loss(d_on_extracted, d_target_label_encoded)
+            # d_loss_on_extracted.backward()
+            # self.optimizer_discrim.step()
+            # self.optimizer_discrim_B.step()
+
+            """Discriminator"""
+            # loss_D_A = self.backward_D_basic(self.discriminator_patchHidden, Cover, Marked)
+            # loss_D_A.backward()
+            # self.optimizer_discrim_patchHiddem.step()
+            # loss_D_B = self.backward_D_basic(self.discriminator_patchRecovery, Water, Extracted)
+            # loss_D_B.backward()
+            # self.optimizer_discrim_patchRecovery.step()
+
+            """Losses"""
+            loss_marked_vgg = self.getVggLoss(Marked, Cover)
+            loss_marked_psnr =  self.mse_loss(Marked, Cover)
+            loss_marked = loss_marked_psnr+loss_marked_vgg
+            # loss_recovery = self.mse_loss(Extracted, Water)
+            loss_recovery_vgg = self.getVggLoss(Extracted_3, Water_3)
+            loss_recovery_psnr = self.mse_loss(Extracted, Water)
+            loss_recovery = loss_recovery_psnr+loss_recovery_vgg
+
+            g_loss_adv_enc = self.criterionGAN(self.discriminator_patchHidden(Marked), True)
+            g_loss_adv_ext = self.criterionGAN(self.discriminator_patchRecovery(Extracted), True)
+
+            # d_on_encoded_for_enc = self.discriminator(Marked)
+            # g_loss_adv_enc = self.bce_with_logits_loss(d_on_encoded_for_enc, g_target_label_encoded)
+            # d_on_encoded_for_ext = self.discriminator(Extracted_3)
+            # g_loss_adv_ext = self.bce_with_logits_loss(d_on_encoded_for_ext, g_target_label_encoded)
+
+            if loss_marked<1:
+                param,residual_param = 1, 0
+            elif loss_marked<1.5:
+                param,residual_param= 1, 0.1
+            elif loss_marked<2:
+                param,residual_param= 0.5, 0.25
+            else:
+                param,residual_param= 0.2, 0.5
+            # if random_noise_layer.name in ["Jpeg90","Jpeg80","Jpeg70","Jpeg60","Jpeg50"]:
+            #     param = 1
+
+            # param = 0.7
+            hyper_discriminator = 0.1+0.9*(1-self.roundCount)
+            print("Param: {0:.4f}, hyper_discriminator:{1:.6f}, residual:{2}".format(param,hyper_discriminator,residual_param))
+            loss_enc_dec = param * loss_recovery
+            loss_enc_dec += param * (g_loss_adv_ext * hyper_discriminator)
+
+            loss_enc_dec += loss_marked
+            loss_enc_dec += g_loss_adv_enc * hyper_discriminator
+
+            """penalty on residual"""
+            Marked_d = utils.denormalize_batch(Marked, self.config.std, self.config.mean)
+            Cover_d = utils.denormalize_batch(Cover, self.config.std, self.config.mean)
+            Extracted_d = utils.denormalize_batch(Extracted, self.config.std, self.config.mean)
+            Water_d = utils.denormalize_batch(Water, self.config.std, self.config.mean)
+            Residual = torch.abs(Marked_d - Cover_d)
+
+            loss_residual = self.mse_loss(Marked - Cover,torch.zeros_like(Cover))
+            # loss_enc_dec += loss_residual * residual_param
+
+
+            # loss_enc_dec.backward()
+            # self.optimizer_encoder.step()
+            # self.optimizer_decoder.step()
+
+            losses = {
+                'loss_marked': loss_marked.item(),
+                'loss_recovery': loss_recovery.item(),
+                'g_loss_adv_enc': g_loss_adv_enc.item(),
+                'g_loss_adv_recovery': g_loss_adv_ext.item(),
+                'loss_residual': loss_residual.item()
+            }
+
+
+            # PSNR
+            print("PSNR:(Hidden Cover) {}".format(
+                10 * math.log10(255.0 ** 2 / torch.mean((Marked_d * 255 - Cover_d * 255) ** 2))))
+            print("PSNR:(Extracted Cover) {}".format(
+                10 * math.log10(255.0 ** 2 / torch.mean((Extracted_d * 255 - Water_d * 255) ** 2))))
+            # SSIM
+            print("SSIM:(Hidden Cover) {}".format(pytorch_ssim.ssim(Marked_d, Cover_d)))
+            print("SSIM:(Recover Cover) {}".format(pytorch_ssim.ssim(Extracted_d, Water_d)))
+
+            return losses, (Marked, Extracted, Residual, Attacked), random_noise_layer.name
 
     def save_model(self, state, filename='./checkpoint.pth.tar'):
         state['roundCount']=self.roundCount
@@ -247,9 +391,9 @@ class RobustImageNet:
         checkpoint = torch.load(filename)
         if 'roundCount' in checkpoint:
             self.roundCount = checkpoint['roundCount']
-        self.encoder.load_state_dict(checkpoint['encoder_state_dict'])
+        self.encoder.load_state_dict(checkpoint['encoder_state_dict'],strict=False)
         # print(self.encoder)
-        self.decoder.load_state_dict(checkpoint['decoder_state_dict'])
+        self.decoder.load_state_dict(checkpoint['decoder_state_dict'],strict=False)
         # print(self.decoder)
         self.discriminator_patchHidden.load_state_dict(checkpoint['discriminator_patchHidden_state_dict'])
         self.discriminator_patchRecovery.load_state_dict(checkpoint['discriminator_patchRecovery_state_dict'])

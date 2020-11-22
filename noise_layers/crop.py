@@ -1,6 +1,7 @@
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
+from config import GlobalConfig
 
 def random_float(min, max):
     """
@@ -51,13 +52,14 @@ class Crop(nn.Module):
     Randomly crops the image from top/bottom and left/right. The amount to crop is controlled by parameters
     heigth_ratio_range and width_ratio_range
     """
-    def __init__(self, height_ratio_range=(0.7,1), width_ratio_range=(0.7,1)):
+    def __init__(self, height_ratio_range=(0.5,1), width_ratio_range=(0.5,1), config=GlobalConfig()):
         """
 
         :param height_ratio_range:
         :param width_ratio_range:
         """
         super(Crop, self).__init__()
+        self.config = config
         self.height_ratio_range = height_ratio_range
         self.width_ratio_range = width_ratio_range
         self.h_start, self.h_end, self.w_start, self.w_end = None,None,None,None
@@ -74,22 +76,22 @@ class Crop(nn.Module):
         if self.h_start is None:
             self.h_start, self.h_end, self.w_start, self.w_end, _ = get_random_rectangle_inside(noised_image, self.height_ratio_range, self.width_ratio_range)
         else:
-            self.h_start = int(self.h_start/4)
-            self.h_end = int(self.h_end / 4)
-            self.w_start = int(self.w_start / 4)
-            self.w_end = int(self.w_end / 4)
+            self.h_start = int(self.h_start/ (self.config.Width/self.config.Water_Width))
+            self.h_end = int(self.h_end / (self.config.Width/self.config.Water_Width))
+            self.w_start = int(self.w_start / (self.config.Width/self.config.Water_Width))
+            self.w_end = int(self.w_end / (self.config.Width/self.config.Water_Width))
 
-        noised_image = noised_image[:,:,self.h_start: self.h_end,self.w_start: self.w_end].clone()
+        cropped_image = noised_image[:,:,self.h_start: self.h_end,self.w_start: self.w_end].clone()
 
         resize_back = F.interpolate(
-            noised_image,
+            cropped_image,
             size=[cover_image.shape[2],cover_image.shape[3]],
             recompute_scale_factor=True,
             mode='nearest')
 
 
 
-        print("Crop Attack Added. {}".format(self.bool))
+        print("Crop Attack Added. {0}, Sizee:{1} {2} {3} {4}".format(self.bool,self.h_start,self.h_end,self.w_start,self.w_end))
         self.name = "Crop"
         if self.bool:
             self.h_start, self.h_end, self.w_start, self.w_end = None,None,None,None

@@ -8,12 +8,12 @@ class Cropout(nn.Module):
     Combines the noised and cover images into a single image, as follows: Takes a crop of the noised image, and takes the rest from
     the cover image. The resulting image has the same size as the original and the noised images.
     """
-    def __init__(self, height_ratio_range=(0.1,0.25), width_ratio_range=(0.1,0.25)):
+    def __init__(self, height_ratio_range=(0.2,0.5), width_ratio_range=(0.2,0.5)):
         super(Cropout, self).__init__()
         self.height_ratio_range = height_ratio_range
         self.width_ratio_range = width_ratio_range
 
-    def forward(self, noised_image, cover_image=None):
+    def forward(self, noised_image, cover_image):
         # noised_image = noised_and_cover[0]
         # cover_image = noised_and_cover[1]
         print("Cropout Attack Added")
@@ -26,5 +26,5 @@ class Cropout(nn.Module):
                                                                      width_ratio_range=self.width_ratio_range)
         cropout_mask[:, :, h_start:h_end, w_start:w_end] = 1
 
-        noised_image = noised_image * cropout_mask + cover_image * (1-cropout_mask)
+        noised_image = noised_image * (1-cropout_mask) + cover_image * cropout_mask
         return  noised_image

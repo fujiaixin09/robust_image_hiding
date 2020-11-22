@@ -4,13 +4,13 @@ class GlobalConfig():
 
     def __init__(self):
 
-        self.num_epochs = 100
+        self.num_epochs = 1
         self.train_batch_size = 8
         self.test_batch_size = 1
         self.architecture='ResNet'
         self.Height = 256
         self.Width = 256
-        self.Water_Width = 64
+        self.Water_Width = 128
         self.temperature = 10
         self.hyper = 2
         self.hyper_discriminator = 0.1
@@ -19,7 +19,7 @@ class GlobalConfig():
         self.encoder_features = 64
         self.water_features = 256
         self.device = torch.device("cuda")
-        self.num_classes = 1
+        self.conductTest = True
 
 
         self.use_dataset = 'COCO'  # "ImageNet"
@@ -41,6 +41,7 @@ class GlobalConfig():
         if self.use_dataset == 'COCO':
             self.TAG_PATH = None
             self.TRAIN_PATH = 'C:\\COCOdataset\\train2017\\'
+            self.TEST_PATH = 'C:\\COCOdataset\\test2017\\'
             self.mean = [0.471, 0.448, 0.408]
             self.std = [0.234, 0.239, 0.242]
         else:
