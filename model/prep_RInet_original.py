@@ -32,9 +32,9 @@ class UnetInception(nn.Module):
         )
         self.pureDownsamle = PureUpsampling(scale=1/2)
         self.downsample_7_Secret = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=3, stride=1, dilation=1, padding=1),
+            nn.Conv2d(1, 32, kernel_size=3, stride=1, dilation=1, padding=1),
             nn.ELU(inplace=True),
-            SingleConv(16, out_channels=16, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(32, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1),
         )
         # 64
         self.downsample_6_Cover = nn.Sequential(
@@ -49,7 +49,7 @@ class UnetInception(nn.Module):
         )
         self.downsample_6_Secret_added = nn.Sequential(
             PureUpsampling(scale=1 / 2),
-            SingleConv(16, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(32, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1),
             SingleConv(32, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1)
         )
         # 32
@@ -97,6 +97,10 @@ class UnetInception(nn.Module):
             SingleConv(64*2, out_channels=64, kernel_size=3, stride=1, dilation=1, padding=1),
             SingleConv(64, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1)
         )
+        self.upsample2_3_added = nn.Sequential(
+            SingleConv(64*2+32, out_channels=64, kernel_size=3, stride=1, dilation=1, padding=1),
+            SingleConv(64, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1)
+        )
         # 256
         self.upsample1_3 = nn.Sequential(
             SingleConv(32*2, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1),
@@ -139,8 +143,11 @@ class UnetInception(nn.Module):
         up3 = self.upsample3_3(up3_cat)
         # 128
         up2_up = self.pureUpsamle(up3)
-        up2_cat = torch.cat((down7, up2_up), 1)
-        up2 = self.upsample2_3(up2_cat)
+        up2_cat_original = torch.cat((down7, up2_up), 1)
+        up2_cat_added = torch.cat((down7, down7_secret_added,  up2_up), 1)
+        up2_original = self.upsample2_3(up2_cat_original)
+        up2_added = self.upsample2_3_added(up2_cat_added)
+        up2 = up2_original * roundSum + up2_added * (1 - roundSum)
         # 256
         up1_up = self.pureUpsamle(up2)
         up1_cat = torch.cat((down8, up1_up), 1)

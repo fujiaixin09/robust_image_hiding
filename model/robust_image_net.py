@@ -50,7 +50,7 @@ class RobustImageNet:
         self.jpeg_layer_50 = DiffJPEG(256, 256, quality=50, differentiable=True).cuda()
         self.gaussian = Gaussian().cuda()
         self.gaussian_blur = GaussianBlur().cuda()
-        self.dropout = Dropout(self.config,keep_ratio_range=(0.7,1)).cuda()
+        self.dropout = Dropout().cuda()
         self.resize = Resize().cuda()
         self.cropout_layer = Cropout().cuda()
         self.crop_layer = Crop().cuda()

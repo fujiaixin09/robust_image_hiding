@@ -92,7 +92,11 @@ class mainClass:
     # ------------------------------------ Begin ---------------------------------------
     # Creates net object
     def run(self,Epoch):
-        self.net.load_model("./checkpoints/Epoch N1 Batch 14335.pth.tar")
+        if Epoch==0:
+            """pre-trained model"""
+            self.net.load_model("./checkpoints/Epoch N1 Batch 13311.pth.tar")
+        else:
+            self.net.load_model("./checkpoints/Epoch N{0} Batch 14335.pth.tar".format(max(1,Epoch)))
         train_water_iterator = iter(self.train_water_loader)
         test_iterator = iter(self.test_loader)
         test_water_iterator = iter(self.test_water_loader)

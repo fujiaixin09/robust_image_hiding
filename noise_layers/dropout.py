@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 import numpy as np
-
+from config import GlobalConfig
 class Dropout(nn.Module):
     """
     Drops random pixels from the noised image and substitues them with the pixels from the cover image
     """
-    def __init__(self, config,keep_ratio_range=(0.75,1)):
+    def __init__(self, config=GlobalConfig() ,keep_ratio_range=(0.75,1)):
         super(Dropout, self).__init__()
         self.config = config
         self.device = config.device
