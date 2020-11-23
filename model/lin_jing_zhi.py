@@ -13,8 +13,8 @@ from noise_layers.cropout import Cropout
 from noise_layers.crop import Crop
 from noise_layers.gaussian_blur import GaussianBlur
 from config import GlobalConfig
-from model.prep_RInet_256 import UnetInception
-from model.prep_HQnet_256 import Prep_pureUnet
+from model.prep_RInet_64 import UnetInception
+from model.prep_HQnet_64 import Prep_pureUnet
 import numpy as np
 from model.NLayerDiscriminator import NLayerDiscriminator
 from loss.GANloss import GANLoss
@@ -25,9 +25,9 @@ import utils
 from network.pure_upsample import PureUpsampling
 from model.discriminator import Discriminator
 
-class RobustImageNet:
+class LinJingZhiNet:
     def __init__(self, config=GlobalConfig()):
-        super(RobustImageNet, self).__init__()
+        super(LinJingZhiNet, self).__init__()
         self.config = config
         """ Settings """
         self.criterionGAN = GANLoss().cuda()
