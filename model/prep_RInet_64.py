@@ -121,9 +121,9 @@ class UnetInception(nn.Module):
         # down7_secret_added = self.downsample_7_Secret(secret)
         # 64
         down6 = self.downsample_6_Cover(down7)
-        down6_secret = self.downsample_6_Secret(self.pureDownsamle(secret))
+        down6_secret_original = self.downsample_6_Secret(self.pureDownsamle(secret))
         # down6_secret_added = self.downsample_6_Secret_added(down7_secret_added)
-        # down6_secret = down6_secret_original*roundSum+down6_secret_added*(1-roundSum)
+        down6_secret = down6_secret_original*roundSum+down6_secret_added*(1-roundSum)
         # 32
         down5 = self.downsample_5_Cover(down6)
         down5_secret = self.downsample_5_Secret(down6_secret)
@@ -144,10 +144,10 @@ class UnetInception(nn.Module):
         # 128
         up2_up = self.pureUpsamle(up3)
         up2_cat_original = torch.cat((down7, up2_up), 1)
-        # up2_cat_added = torch.cat((down7, down7_secret_added,  up2_up), 1)
+        up2_cat_added = torch.cat((down7, down7_secret_added,  up2_up), 1)
         up2_original = self.upsample2_3(up2_cat_original)
-        # up2_added = self.upsample2_3_added(up2_cat_added)
-        up2 = up2_original # * roundSum + up2_added * (1 - roundSum)
+        up2_added = self.upsample2_3_added(up2_cat_added)
+        up2 = up2_original * roundSum + up2_added * (1 - roundSum)
         # 256
         up1_up = self.pureUpsamle(up2)
         up1_cat = torch.cat((down8, up1_up), 1)

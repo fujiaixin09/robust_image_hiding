@@ -10,7 +10,7 @@ import torchvision.datasets as datasets
 from torch.utils import data
 from torchvision import transforms
 from config import GlobalConfig
-from model.robust_image_net import RobustImageNet
+from model.lin_jing_zhi import LinJingZhiNet
 from my_dataset import MyDataset
 import utils
 
@@ -36,8 +36,8 @@ class mainClass:
             pin_memory=True, shuffle=False, drop_last=True)
         # Creates water set
         train_water_transform = transforms.Compose([
-            transforms.Resize(self.config.Water_Width),
-            transforms.RandomCrop(self.config.Water_Width),
+            transforms.Resize(128),
+            transforms.RandomCrop(128),
             # transforms.Grayscale(),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.config.mean[0],
@@ -64,8 +64,8 @@ class mainClass:
             pin_memory=True, shuffle=False, drop_last=True)
         # Creates water test set
         test_water_transform = transforms.Compose([
-            transforms.Resize(self.config.Water_Width),
-            transforms.RandomCrop(self.config.Water_Width),
+            transforms.Resize(128),
+            transforms.RandomCrop(128),
             # transforms.Grayscale(),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.config.mean[0],
@@ -85,7 +85,7 @@ class mainClass:
         # self.another_loader = data.DataLoader(dataset=self.another_dataset, batch_size=self.config.train_batch_size,
         #                                     shuffle=False, num_workers=4)
 
-        self.net = RobustImageNet(config=self.config)
+        self.net = LinJingZhiNet(config=self.config)
         self.train_cover, self.train_water = None, None
         self.test_cover, self.test_water = None, None
 
@@ -94,8 +94,8 @@ class mainClass:
     def run(self,Epoch):
         if Epoch==0:
             """pre-trained model"""
-            # pass
-            self.net.load_model("./checkpoints/Epoch N6 Batch 10239.pth.tar")
+            pass
+            # self.net.load_model("./checkpoints/Epoch N1 Batch 7167.pth.tar")
         else:
             self.net.load_model("./checkpoints/Epoch N{0} Batch 14335.pth.tar".format(max(1,Epoch)))
         train_water_iterator = iter(self.train_water_loader)

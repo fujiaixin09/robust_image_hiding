@@ -13,8 +13,8 @@ from noise_layers.cropout import Cropout
 from noise_layers.crop import Crop
 from noise_layers.gaussian_blur import GaussianBlur
 from config import GlobalConfig
-from model.prep_RInet_64 import UnetInception
-from model.prep_HQnet_64 import Prep_pureUnet
+from model.prep_RInet_128 import UnetInception
+from model.prep_HQnet_128 import Prep_pureUnet
 import numpy as np
 from model.NLayerDiscriminator import NLayerDiscriminator
 from loss.GANloss import GANLoss
@@ -42,7 +42,7 @@ class LinJingZhiNet:
         self.optimizer_encoder = torch.optim.Adam(self.encoder.parameters())
         self.optimizer_decoder = torch.optim.Adam(self.decoder.parameters())
         """ Noise Layers """
-        self.noise_layers = [Identity().cuda()]
+
         self.jpeg_layer_80 = DiffJPEG(256, 256, quality=80, differentiable=True).cuda()
         self.jpeg_layer_90 = DiffJPEG(256, 256, quality=90, differentiable=True).cuda()
         self.jpeg_layer_70 = DiffJPEG(256, 256, quality=70, differentiable=True).cuda()
@@ -54,17 +54,21 @@ class LinJingZhiNet:
         self.resize = Resize().cuda()
         self.cropout_layer = Cropout().cuda()
         self.crop_layer = Crop().cuda()
-        self.noise_layers.append(self.jpeg_layer_80)
-        self.noise_layers.append(self.jpeg_layer_90)
-        self.noise_layers.append(self.jpeg_layer_70)
-        self.noise_layers.append(self.jpeg_layer_60)
-        self.noise_layers.append(self.jpeg_layer_50)
-        self.noise_layers.append(self.gaussian)
-        self.noise_layers.append(self.resize)
-        self.noise_layers.append(self.dropout)
-        self.noise_layers.append(self.gaussian_blur)
-        self.noise_layers.append(self.cropout_layer)
-        self.noise_layers.append(self.crop_layer)
+        self.hard_noise_layers = []
+        self.normal_noise_layers = []
+        self.hard_noise_layers.append(Identity().cuda())
+        self.hard_noise_layers.append(self.jpeg_layer_70)
+        self.hard_noise_layers.append(self.jpeg_layer_60)
+        self.hard_noise_layers.append(self.jpeg_layer_50)
+        self.hard_noise_layers.append(self.cropout_layer)
+        self.hard_noise_layers.append(self.dropout)
+        self.hard_noise_layers.append(self.resize)
+        self.hard_noise_layers.append(self.gaussian_blur)
+        self.hard_noise_layers.append(self.crop_layer)
+        self.hard_noise_layers.append(self.gaussian)
+        self.hard_noise_layers.append(self.jpeg_layer_90)
+        self.hard_noise_layers.append(self.jpeg_layer_80)
+
 
         # self.discriminator = Discriminator(self.config).cuda()
         # if torch.cuda.device_count() > 1:
@@ -75,7 +79,7 @@ class LinJingZhiNet:
         self.discriminator_patchHidden = NLayerDiscriminator(input_nc=3).cuda()
         if torch.cuda.device_count() > 1:
             self.discriminator_patchHidden = torch.nn.DataParallel(self.discriminator_patchHidden)
-        self.discriminator_patchRecovery = NLayerDiscriminator(input_nc=1).cuda()
+        self.discriminator_patchRecovery = NLayerDiscriminator(input_nc=self.config.waterChannel).cuda()
         if torch.cuda.device_count() > 1:
             self.discriminator_patchRecovery = torch.nn.DataParallel(self.discriminator_patchRecovery)
 
@@ -105,6 +109,7 @@ class LinJingZhiNet:
             让分类网络在T=1时，分类结果为正常结果
             T=10时，分类结果为水印序列对应结果
         """
+        self.noise_layers = self.hard_noise_layers
         batch_size = Cover.shape[0]
         self.encoder.train()
         self.decoder.train()
@@ -112,7 +117,7 @@ class LinJingZhiNet:
         self.discriminator_patchRecovery.train()
         # self.discriminator.train()
         # self.discriminator_B.train()
-        self.roundCount -= batch_size / (2*118287)
+        self.roundCount -= batch_size / (5*118287)
         if self.roundCount < 0:
             self.roundCount = 0
         with torch.enable_grad():
@@ -168,12 +173,12 @@ class LinJingZhiNet:
 
             """Losses"""
             loss_marked_vgg = self.getVggLoss(Marked, Cover)
-            loss_marked_psnr =  self.mse_loss(Marked, Cover)
-            loss_marked = loss_marked_psnr+loss_marked_vgg
+            loss_marked_psnr = self.mse_loss(Marked, Cover)
+            loss_marked = loss_marked_vgg + loss_marked_psnr
             # loss_recovery = self.mse_loss(Extracted, Water)
             loss_recovery_vgg = self.getVggLoss(Extracted_3, Water_3)
             loss_recovery_psnr = self.mse_loss(Extracted, Water)
-            loss_recovery = loss_recovery_psnr+loss_recovery_vgg
+            loss_recovery = loss_recovery_vgg + loss_recovery_psnr
 
             g_loss_adv_enc = self.criterionGAN(self.discriminator_patchHidden(Marked), True)
             g_loss_adv_ext = self.criterionGAN(self.discriminator_patchRecovery(Extracted), True)
@@ -183,20 +188,19 @@ class LinJingZhiNet:
             # d_on_encoded_for_ext = self.discriminator(Extracted_3)
             # g_loss_adv_ext = self.bce_with_logits_loss(d_on_encoded_for_ext, g_target_label_encoded)
 
-            if loss_marked<1:
-                param,param_cover = 1, 0.7
-            elif loss_marked<1.5:
+            if loss_marked_vgg<1:
+                param,param_cover = 1, 0.5
+            elif loss_marked_vgg<1.5:
+                param,param_cover= 1, 0.7
+            elif loss_marked_vgg<2:
                 param,param_cover= 1, 1
-            elif loss_marked<2:
-                param,param_cover= 0.5, 1
             else:
-                param,param_cover= 0.2, 1
-            # if random_noise_layer.name in ["Jpeg90","Jpeg80","Jpeg70","Jpeg60","Jpeg50"]:
-            #     param = 1
+                param,param_cover= 0.7, 1
+
 
             # param = 0.7
             hyper_discriminator = 0.1+0.9*(1-self.roundCount)
-            print("Param: {0:.4f}, hyper_discriminator:{1:.6f}, param cover:{2}".format(param,hyper_discriminator,param_cover))
+            print("Param: {0:.4f}, roundCount:{1:.6f}, param cover:{2}".format(param,self.roundCount,param_cover))
             loss_enc_dec = param * loss_recovery
             loss_enc_dec += param * (g_loss_adv_ext * hyper_discriminator)
 
@@ -220,6 +224,7 @@ class LinJingZhiNet:
 
             losses = {
                 'loss_marked': loss_marked.item(),
+                'loss_marked_vgg': loss_marked_vgg.item(),
                 'loss_recovery': loss_recovery.item(),
                 'g_loss_adv_enc': g_loss_adv_enc.item(),
                 'g_loss_adv_recovery': g_loss_adv_ext.item(),
@@ -246,6 +251,7 @@ class LinJingZhiNet:
             T=10时，分类结果为水印序列对应结果
         """
         # batch_size = Cover.shape[0]
+        self.noise_layers = self.hard_noise_layers + self.normal_noise_layers
         self.encoder.eval()
         self.decoder.eval()
         self.discriminator_patchHidden.eval()
@@ -386,17 +392,22 @@ class LinJingZhiNet:
         torch.save(state, filename)
         print("Successfully Saved: " + filename)
 
-    def load_model(self, filename):
+    def load_model(self, filename, discardRoundCount=False, loadDiscriminator=True):
         print("Reading From: " + filename)
         checkpoint = torch.load(filename)
-        if 'roundCount' in checkpoint:
+        if 'roundCount' in checkpoint and not discardRoundCount:
             self.roundCount = checkpoint['roundCount']
+        else:
+            self.roundCount = 1.0
         self.encoder.load_state_dict(checkpoint['encoder_state_dict'],strict=False)
         # print(self.encoder)
         self.decoder.load_state_dict(checkpoint['decoder_state_dict'],strict=False)
         # print(self.decoder)
-        self.discriminator_patchHidden.load_state_dict(checkpoint['discriminator_patchHidden_state_dict'])
-        self.discriminator_patchRecovery.load_state_dict(checkpoint['discriminator_patchRecovery_state_dict'])
+
+        if loadDiscriminator:
+            self.discriminator_patchHidden.load_state_dict(checkpoint['discriminator_patchHidden_state_dict'])
+            self.discriminator_patchRecovery.load_state_dict(checkpoint['discriminator_patchRecovery_state_dict'])
+
         # self.discriminator.load_state_dict(checkpoint['discriminator_state_dict'])
         # self.discriminator_B.load_state_dict(checkpoint['discriminatorB_state_dict'])
         print("Successfully Loaded All modes in: " + filename)

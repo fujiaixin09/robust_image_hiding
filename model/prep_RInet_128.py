@@ -19,11 +19,11 @@ class UnetInception(nn.Module):
             nn.ELU(inplace=True),
             SingleConv(32, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1), #2
         )
-        self.downsample_8_Secret = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=5, stride=1, dilation=1, padding=2),
-            nn.ELU(inplace=True),
-            SingleConv(16, out_channels=16, kernel_size=5, stride=1, dilation=1, padding=2),
-        )
+        # self.downsample_8_Secret = nn.Sequential(
+        #     nn.Conv2d(3, 16, kernel_size=5, stride=1, dilation=1, padding=2),
+        #     nn.ELU(inplace=True),
+        #     SingleConv(16, out_channels=16, kernel_size=5, stride=1, dilation=1, padding=2),
+        # )
         # 128
         self.downsample_7_Cover = nn.Sequential(
             PureUpsampling(scale=1 / 2),
@@ -32,8 +32,8 @@ class UnetInception(nn.Module):
         )
         # self.pureDownsamle = PureUpsampling(scale=1/2)
         self.downsample_7_Secret = nn.Sequential(
-                PureUpsampling(scale=1 / 2),
-                SingleConv(16, out_channels=32, kernel_size=5, stride=1, dilation=1, padding=2),
+                nn.Conv2d(3, 32, kernel_size=5, stride=1, dilation=1, padding=2),
+                nn.ELU(inplace=True),
                 SingleConv(32, out_channels=32, kernel_size=5, stride=1, dilation=1, padding=2),
         )
         # self.downsample_7_Secret_added = nn.Sequential(
@@ -108,7 +108,7 @@ class UnetInception(nn.Module):
         )
         # 256
         self.upsample1_3 = nn.Sequential(
-            SingleConv(32*2+16, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1), #1
+            SingleConv(32*2, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1), #1
             SingleConv(32, out_channels=32, kernel_size=3, stride=1, dilation=1, padding=1), #2
         )
         # self.upsample1_3_added = nn.Sequential(
@@ -124,11 +124,11 @@ class UnetInception(nn.Module):
     def forward(self, cover, secret, roundSum=1):
         # 256
         down8 = self.downsample_8_Cover(cover)
-        down8_secret_added = self.downsample_8_Secret(secret)
+        # down8_secret_added = self.downsample_8_Secret(secret)
         # 128
         down7 = self.downsample_7_Cover(down8)
         # down7_secret_original = self.downsample_7_Secret(secret)
-        down7_secret_added = self.downsample_7_Secret(down8_secret_added)
+        down7_secret_added = self.downsample_7_Secret(secret)
         # down7_secret = down7_secret_original # * roundSum + down7_secret_added * (1 - roundSum)
         # 64
         down6 = self.downsample_6_Cover(down7)
@@ -161,7 +161,7 @@ class UnetInception(nn.Module):
         up2 = up2_added
         # 256
         up1_up = self.pureUpsamle(up2)
-        up1_cat_original = torch.cat((down8, down8_secret_added,up1_up), 1)
+        up1_cat_original = torch.cat((down8,up1_up), 1)
         up1_original = self.upsample1_3(up1_cat_original)
         # up1_cat_added = torch.cat((down8, down8_secret_added, up1_up), 1)
         # up1_added = self.upsample1_3_added(up1_cat_added)

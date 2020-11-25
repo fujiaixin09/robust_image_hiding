@@ -10,7 +10,8 @@ class GlobalConfig():
         self.architecture='ResNet'
         self.Height = 256
         self.Width = 256
-        self.Water_Width = 128
+        self.Water_Width = 256
+        self.waterChannel = 3
         self.temperature = 10
         self.hyper = 2
         self.hyper_discriminator = 0.1
@@ -20,6 +21,7 @@ class GlobalConfig():
         self.water_features = 256
         self.device = torch.device("cuda")
         self.conductTest = True
+        self.message_length = 64
 
 
         self.use_dataset = 'COCO'  # "ImageNet"

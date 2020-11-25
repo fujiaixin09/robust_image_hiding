@@ -22,7 +22,7 @@ class RevealNetwork(nn.Module):
         self.finalR5 = DoubleConv(150, 50, mode=2)
 
         self.finalR = nn.Sequential(
-            nn.Conv2d(150, 1, kernel_size=1, padding=0))
+            nn.Conv2d(150, 3, kernel_size=1, padding=0))
 
     def forward(self, r):
         r1 = self.initialR3(r)

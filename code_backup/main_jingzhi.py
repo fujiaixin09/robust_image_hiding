@@ -1,5 +1,5 @@
 import os
-
+import numpy as np
 import torch
 import torch.distributed as dist
 import torch.nn.parallel
@@ -7,11 +7,9 @@ import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.datasets as datasets
-from torch.utils import data
 from torchvision import transforms
 from config import GlobalConfig
-from model.lin_jing_zhi import LinJingZhiNet
-from my_dataset import MyDataset
+from code_backup.lin_jing_zhi import LinJingZhiNet
 import utils
 
 class mainClass:
@@ -88,13 +86,14 @@ class mainClass:
         self.net = LinJingZhiNet(config=self.config)
         self.train_cover, self.train_water = None, None
         self.test_cover, self.test_water = None, None
+        self.pseudo = np.random.choice([0, 1], (self.config.message_length, self.config.message_length*self.config.message_length))
 
     # ------------------------------------ Begin ---------------------------------------
     # Creates net object
     def run(self,Epoch):
         if Epoch==0:
             """pre-trained model"""
-            self.net.load_model("./checkpoints/Epoch N1 Batch 13311.pth.tar")
+            self.net.load_model("./checkpoint_backup/64model/Epoch N1 Batch 13311.pth.tar")
         else:
             self.net.load_model("./checkpoints/Epoch N{0} Batch 14335.pth.tar".format(max(1,Epoch)))
         train_water_iterator = iter(self.train_water_loader)
@@ -110,11 +109,18 @@ class mainClass:
                 说明：水印图像本来是直接由self.train_water_loader读取灰度图像进来，这边现在就是用水印序列经过纠错编码后把它用矩阵形式表示出来
                 所以这边需要改一下，水印序列可以用随机0 1来生成，需要找一个比较好的纠错编码
                 """
-                self.train_water, _ = train_water_iterator.__next__()
-                self.train_water = self.train_water.cuda()
+                # self.train_water, _ = train_water_iterator.__next__()
+                # self.train_water = self.train_water.cuda()
 
-                # train_tag = tag.cuda()
-                losses, images, name = self.net.train_on_batch(self.train_cover, self.train_water)
+                message_np = np.random.choice([0, 1], (1, self.config.message_length))
+                encoded_message_np = np.dot(message_np,self.pseudo) % 2
+                encoded_message = torch.tensor(encoded_message_np,dtype=torch.float32).cuda()
+                encoded_message = encoded_message.reshape(64, 64)
+                encoded_message = encoded_message.unsqueeze(0).unsqueeze(0).expand(self.config.train_batch_size, -1 , -1, -1)
+                message = torch.tensor(message_np,dtype=torch.float32).cuda()
+                message = message.expand(self.config.train_batch_size, -1)
+
+                losses, images, name = self.net.train_on_batch(self.train_cover, message, encoded_message)
                 str = 'Training Epoch {0}/{1} Batch {2}/{3}. {4}' \
                     .format(epoch, self.config.num_epochs, idx + 1, len(self.train_loader), losses)
                 print(str)
@@ -125,7 +131,8 @@ class mainClass:
                         'arch': self.config.architecture,
                         'encoder_state_dict': self.net.encoder.state_dict(),
                         'decoder_state_dict': self.net.decoder.state_dict(),
-                        'discriminator_patchRecovery_state_dict': self.net.discriminator_patchRecovery.state_dict(),
+                        'text_decoder_state_dict': self.net.text_decoder.state_dict(),
+                        # 'discriminator_patchRecovery_state_dict': self.net.discriminator_patchRecovery.state_dict(),
                         'discriminator_patchHidden_state_dict': self.net.discriminator_patchHidden.state_dict(),
                     },filename='./checkpoints/Epoch N{0} Batch {1}.pth.tar'.format((epoch + 1),idx))
                 if idx % 128 == 127:
@@ -138,11 +145,11 @@ class mainClass:
                                           filename='./Images/extracted/epoch-{0}-extracted-batch-{1}-{2}-{3}.bmp'.format(epoch, idx, i, name),
                                           std=self.config.std,
                                           mean=self.config.mean)
-                        utils.save_images(watermarked_images=self.train_water[i].cpu(),
-                                          filename='./Images/water/epoch-{0}-water-batch-{1}-{2}-{3}.bmp'.format(
-                                              epoch, idx, i, name),
-                                          std=self.config.std,
-                                          mean=self.config.mean)
+                        # utils.save_images(watermarked_images=self.train_water[i].cpu(),
+                        #                   filename='./Images/water/epoch-{0}-water-batch-{1}-{2}-{3}.bmp'.format(
+                        #                       epoch, idx, i, name),
+                        #                   std=self.config.std,
+                        #                   mean=self.config.mean)
                         utils.save_images(watermarked_images=self.train_cover[i].cpu(),
                                           filename='./Images/cover/epoch-{0}-cover-batch-{1}-{2}-{3}.bmp'.format(
                                               epoch, idx, i, name),
@@ -158,48 +165,53 @@ class mainClass:
                                               epoch, idx, i, name))
                     print("Saved Images Successfully")
 
-                    if self.config.conductTest:
-                        """Test"""
-                        self.test_cover, _ = test_iterator.__next__()
-                        self.test_cover = self.test_cover.cuda()
-                        self.test_water, _ = test_water_iterator.__next__()
-                        self.test_water = self.test_water.cuda()
-                        for attack_num in range(len(self.net.noise_layers)):
-                            losses, images, name = self.net.eval_on_batch(self.test_cover, self.test_water, attack_num=attack_num)
-                            str = '--Test-- Epoch {0}/{1} Batch {2}/{3}. {4}' \
-                                .format(epoch, self.config.num_epochs, idx + 1, len(self.test_loader), losses)
-                            print(str)
-                            marked, extracted, Residual, attacked = images
-                            utils.save_images(watermarked_images=marked[0].cpu(),
-                                              filename='./Test/marked/epoch-{0}-marked-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name),
-                                              std=self.config.std,
-                                              mean=self.config.mean)
-                            utils.save_images(watermarked_images=extracted[0].cpu(),
-                                              filename='./Test/extracted/epoch-{0}-extracted-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name),
-                                              std=self.config.std,
-                                              mean=self.config.mean)
-                            utils.save_images(watermarked_images=self.test_water[0].cpu(),
-                                              filename='./Test/water/epoch-{0}-water-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name),
-                                              std=self.config.std,
-                                              mean=self.config.mean)
-                            utils.save_images(watermarked_images=self.test_cover[0].cpu(),
-                                              filename='./Test/cover/epoch-{0}-cover-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name),
-                                              std=self.config.std,
-                                              mean=self.config.mean)
-                            utils.save_images(watermarked_images=attacked[0].cpu(),
-                                              filename='./Test/attacked/epoch-{0}-attacked-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name),
-                                              std=self.config.std,
-                                              mean=self.config.mean)
-                            utils.save_images(watermarked_images=Residual[0].cpu(),
-                                              filename='./Test/residual/epoch-{0}-residual-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name))
+                    # if self.config.conductTest:
+                    #     """Test"""
+                    #     self.test_cover, _ = test_iterator.__next__()
+                    #     self.test_cover = self.test_cover.cuda()
+                    #     # self.test_water, _ = test_water_iterator.__next__()
+                    #     # self.test_water = self.test_water.cuda()
+                    #     encoded_message = torch.tensor(encoded_message_np, dtype=torch.float32).cuda()
+                    #     encoded_message = encoded_message.unsqueeze(0).unsqueeze(0).expand(self.config.test_batch_size, -1 , -1, -1)
+                    #     message = torch.tensor(message_np, dtype=torch.float32).cuda()
+                    #     message = message.expand(self.config.test_batch_size, -1)
+                    #
+                    #     for attack_num in range(len(self.net.noise_layers)):
+                    #         losses, images, name = self.net.eval_on_batch(self.test_cover, message, encoded_message, attack_num=attack_num)
+                    #         str = '--Test-- Epoch {0}/{1} Batch {2}/{3}. {4}' \
+                    #             .format(epoch, self.config.num_epochs, idx + 1, len(self.test_loader), losses)
+                    #         print(str)
+                    #         marked, extracted, Residual, attacked = images
+                    #         utils.save_images(watermarked_images=marked[0].cpu(),
+                    #                           filename='./Test/marked/epoch-{0}-marked-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name),
+                    #                           std=self.config.std,
+                    #                           mean=self.config.mean)
+                    #         utils.save_images(watermarked_images=extracted[0].cpu(),
+                    #                           filename='./Test/extracted/epoch-{0}-extracted-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name),
+                    #                           std=self.config.std,
+                    #                           mean=self.config.mean)
+                    #         # utils.save_images(watermarked_images=self.test_water[0].cpu(),
+                    #         #                   filename='./Test/water/epoch-{0}-water-batch-{1}-{2}-{3}.bmp'.format(
+                    #         #                       epoch, idx, 0, name),
+                    #         #                   std=self.config.std,
+                    #         #                   mean=self.config.mean)
+                    #         utils.save_images(watermarked_images=self.test_cover[0].cpu(),
+                    #                           filename='./Test/cover/epoch-{0}-cover-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name),
+                    #                           std=self.config.std,
+                    #                           mean=self.config.mean)
+                    #         utils.save_images(watermarked_images=attacked[0].cpu(),
+                    #                           filename='./Test/attacked/epoch-{0}-attacked-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name),
+                    #                           std=self.config.std,
+                    #                           mean=self.config.mean)
+                    #         utils.save_images(watermarked_images=Residual[0].cpu(),
+                    #                           filename='./Test/residual/epoch-{0}-residual-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name))
 
-                        """Test End"""
+                    # """Test End"""
 
 
 if __name__ == '__main__':

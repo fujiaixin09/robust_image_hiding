@@ -48,16 +48,18 @@ def denormalize(image, std, mean):
 #     return
 
 
-def gaussian(tensor, mean=0, stddev=0.1):
-    '''Adds random noise to a tensor.'''
 
-    noise = torch.nn.init.normal_(torch.Tensor(tensor.size()).cuda(), mean, stddev)
-
-    return tensor + noise
 
 
 # Join three networks in one module
 class Net(nn.Module):
+    def gaussian(self, tensor, mean=0, stddev=0.1):
+        '''Adds random noise to a tensor.'''
+
+        noise = torch.nn.init.normal_(torch.Tensor(tensor.size()).cuda(), mean, stddev)
+
+        return tensor + noise
+
     def __init__(self, config=GlobalConfig()):
         super(Net, self).__init__()
         self.config = config
@@ -70,14 +72,24 @@ class Net(nn.Module):
         x_1 = self.m1(secret)
         mid = torch.cat((x_1, cover), 1)
         Hidden = self.m2(mid)
-        x_gaussian = self.gaussian(Hidden)
+        # x_gaussian = self.gaussian(Hidden)
         # x_1_resize = self.resize_layer(x_1_gaussian)
-        x_attack = self.jpeg_layer(x_gaussian)
-        Recovery = self.m3(x_attack)
+        # x_attack = self.jpeg_layer(x_gaussian)
+        Recovery = self.m3(Hidden)
         return Hidden, Recovery
 
 
 class mainClass:
+    def save_model(self, state, filename='./checkpoint.pth.tar'):
+        torch.save(state, filename)
+        print("Successfully Saved: " + filename)
+
+    def load_model(self, filename, discardRoundCount=False, loadDiscriminator=True):
+        print("Reading From: " + filename)
+        checkpoint = torch.load(filename)
+        self.net.load_state_dict(checkpoint['state_dict'])
+        print("Successfully Loaded All modes in: " + filename)
+
     def __init__(self):
         self.config = GlobalConfig()
         os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
@@ -101,7 +113,7 @@ class mainClass:
         train_water_transform = transforms.Compose([
             transforms.Resize(self.config.Width),
             transforms.RandomCrop(self.config.Width),
-            transforms.Grayscale(),
+            # transforms.Grayscale(),
             transforms.ToTensor(),
             transforms.Normalize(mean=self.config.mean[0],
                                  std=self.config.std[0])
@@ -155,7 +167,7 @@ class mainClass:
             pass
             # self.net.load_model("./checkpoints/Epoch N1 Batch 13311.pth.tar")
         else:
-            self.net.load_model("./checkpoints/Epoch N{0} Batch 14335.pth.tar".format(max(1,Epoch)))
+            self.load_model("./checkpoints/Epoch N{0} Batch 14335.pth.tar".format(max(1,Epoch)))
         train_water_iterator = iter(self.train_water_loader)
         test_iterator = iter(self.test_loader)
         test_water_iterator = iter(self.test_water_loader)
@@ -174,7 +186,7 @@ class mainClass:
                     Cover_d = utils.denormalize_batch(self.train_cover, self.config.std, self.config.mean)
                     Residual = torch.abs(Marked_d - Cover_d)
                     # Calculate loss and perform backprop
-                    train_loss, train_loss_cover, train_loss_secret = customized_loss(marked, extracted,
+                    train_loss, train_loss_cover, train_loss_secret = customized_loss(extracted, marked,
                                                                                       self.train_water,
                                                                                       self.train_cover, 1)
                     losses = {
@@ -190,13 +202,13 @@ class mainClass:
                 print(str)
                 # marked, extracted, Residual, attacked = images
                 if idx % 1024 == 1023:
-                    self.net.save_model({
+                    self.save_model({
                         'epoch': epoch + 1,
                         'arch': self.config.architecture,
-                        'encoder_state_dict': self.net.encoder.state_dict(),
-                        'decoder_state_dict': self.net.decoder.state_dict(),
-                        'discriminator_patchRecovery_state_dict': self.net.discriminator_patchRecovery.state_dict(),
-                        'discriminator_patchHidden_state_dict': self.net.discriminator_patchHidden.state_dict(),
+                        'state_dict': self.net.state_dict(),
+                        # 'decoder_state_dict': self.net.decoder.state_dict(),
+                        # 'discriminator_patchRecovery_state_dict': self.net.discriminator_patchRecovery.state_dict(),
+                        # 'discriminator_patchHidden_state_dict': self.net.discriminator_patchHidden.state_dict(),
                     },filename='./checkpoints/Epoch N{0} Batch {1}.pth.tar'.format((epoch + 1),idx))
                 if idx % 128 == 127:
                     for i in range(marked.shape[0]):
@@ -228,48 +240,48 @@ class mainClass:
                                               epoch, idx, i, name))
                     print("Saved Images Successfully")
 
-                    if self.config.conductTest:
-                        """Test"""
-                        self.test_cover, _ = test_iterator.__next__()
-                        self.test_cover = self.test_cover.cuda()
-                        self.test_water, _ = test_water_iterator.__next__()
-                        self.test_water = self.test_water.cuda()
-                        for attack_num in range(len(self.net.noise_layers)):
-                            losses, images, name = self.net.eval_on_batch(self.test_cover, self.test_water, attack_num=attack_num)
-                            str = '--Test-- Epoch {0}/{1} Batch {2}/{3}. {4}' \
-                                .format(epoch, self.config.num_epochs, idx + 1, len(self.test_loader), losses)
-                            print(str)
-                            marked, extracted, Residual, attacked = images
-                            utils.save_images(watermarked_images=marked[0].cpu(),
-                                              filename='./network_deepsteg/Test/marked/epoch-{0}-marked-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name),
-                                              std=self.config.std,
-                                              mean=self.config.mean)
-                            utils.save_images(watermarked_images=extracted[0].cpu(),
-                                              filename='./network_deepsteg/Test/extracted/epoch-{0}-extracted-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name),
-                                              std=self.config.std,
-                                              mean=self.config.mean)
-                            utils.save_images(watermarked_images=self.test_water[0].cpu(),
-                                              filename='./network_deepsteg/Test/water/epoch-{0}-water-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name),
-                                              std=self.config.std,
-                                              mean=self.config.mean)
-                            utils.save_images(watermarked_images=self.test_cover[0].cpu(),
-                                              filename='./network_deepsteg/Test/cover/epoch-{0}-cover-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name),
-                                              std=self.config.std,
-                                              mean=self.config.mean)
-                            utils.save_images(watermarked_images=attacked[0].cpu(),
-                                              filename='./network_deepsteg/Test/attacked/epoch-{0}-attacked-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name),
-                                              std=self.config.std,
-                                              mean=self.config.mean)
-                            utils.save_images(watermarked_images=Residual[0].cpu(),
-                                              filename='./network_deepsteg/Test/residual/epoch-{0}-residual-batch-{1}-{2}-{3}.bmp'.format(
-                                                  epoch, idx, 0, name))
-
-                        """Test End"""
+                    # if self.config.conductTest:
+                    #     """Test"""
+                    #     self.test_cover, _ = test_iterator.__next__()
+                    #     self.test_cover = self.test_cover.cuda()
+                    #     self.test_water, _ = test_water_iterator.__next__()
+                    #     self.test_water = self.test_water.cuda()
+                    #     for attack_num in range(len(self.net.noise_layers)):
+                    #         losses, images, name = self.net.eval_on_batch(self.test_cover, self.test_water, attack_num=attack_num)
+                    #         str = '--Test-- Epoch {0}/{1} Batch {2}/{3}. {4}' \
+                    #             .format(epoch, self.config.num_epochs, idx + 1, len(self.test_loader), losses)
+                    #         print(str)
+                    #         marked, extracted, Residual, attacked = images
+                    #         utils.save_images(watermarked_images=marked[0].cpu(),
+                    #                           filename='./network_deepsteg/Test/marked/epoch-{0}-marked-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name),
+                    #                           std=self.config.std,
+                    #                           mean=self.config.mean)
+                    #         utils.save_images(watermarked_images=extracted[0].cpu(),
+                    #                           filename='./network_deepsteg/Test/extracted/epoch-{0}-extracted-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name),
+                    #                           std=self.config.std,
+                    #                           mean=self.config.mean)
+                    #         utils.save_images(watermarked_images=self.test_water[0].cpu(),
+                    #                           filename='./network_deepsteg/Test/water/epoch-{0}-water-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name),
+                    #                           std=self.config.std,
+                    #                           mean=self.config.mean)
+                    #         utils.save_images(watermarked_images=self.test_cover[0].cpu(),
+                    #                           filename='./network_deepsteg/Test/cover/epoch-{0}-cover-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name),
+                    #                           std=self.config.std,
+                    #                           mean=self.config.mean)
+                    #         utils.save_images(watermarked_images=attacked[0].cpu(),
+                    #                           filename='./network_deepsteg/Test/attacked/epoch-{0}-attacked-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name),
+                    #                           std=self.config.std,
+                    #                           mean=self.config.mean)
+                    #         utils.save_images(watermarked_images=Residual[0].cpu(),
+                    #                           filename='./network_deepsteg/Test/residual/epoch-{0}-residual-batch-{1}-{2}-{3}.bmp'.format(
+                    #                               epoch, idx, 0, name))
+                    #
+                    #     """Test End"""
 
 
 if __name__ == '__main__':
